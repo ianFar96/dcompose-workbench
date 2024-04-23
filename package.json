@@ -31,6 +31,7 @@
     "@typescript-eslint/eslint-plugin": "6.19.1",
     "@typescript-eslint/parser": "6.19.1",
     "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.19",
     "confusing-browser-globals": "^1.0.11",
     "eslint": "^8.56.0",
     "eslint-config-esnext": "^4.1.0",
@@ -42,6 +43,8 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-sort-keys-fix": "^1.1.2",
     "eslint-visitor-keys": "3.4.3",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3",
     "typescript": "^5.0.2",
     "vite": "^5.0.0"
   }

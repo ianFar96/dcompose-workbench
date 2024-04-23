@@ -6,12 +6,12 @@ import { Handle, Position } from 'reactflow';
 export default function CustomNode(_props: NodeProps) {
   return (
     <>
-      <Card className='drag' style={{ padding: 0 }} variant='elevation'>
-        <CardContent>
+      <Card className='h-24 w-52' variant='elevation'>
+        <CardContent className='relative h-full'>
           <Typography component='div' variant='h5'>
               sv_dogs
           </Typography>
-          <Chip color='primary' label='Single View Creator' size='small' variant='outlined' />
+          <Chip className='absolute bottom-2 left-3' color='primary' label='Single View Creator' size='small' variant='outlined' />
 
           <Handle position={Position.Left} type='target' />
           <Handle position={Position.Right} type='source' />
