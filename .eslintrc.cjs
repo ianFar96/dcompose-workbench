@@ -1,14 +1,14 @@
 
 /* eslint-disable sort-keys-fix/sort-keys-fix */
-const path = require('path')
+const path = require('path');
 
-const restrictedGlobals = require('confusing-browser-globals')
-const moduleConfig = require('eslint-plugin-n/lib/configs/recommended-module').eslintrc
-const scriptConfig = require('eslint-plugin-n/lib/configs/recommended-script').eslintrc
-const getPackageJson = require('eslint-plugin-n/lib/util/get-package-json')
+const restrictedGlobals = require('confusing-browser-globals');
+const moduleConfig = require('eslint-plugin-n/lib/configs/recommended-module').eslintrc;
+const scriptConfig = require('eslint-plugin-n/lib/configs/recommended-script').eslintrc;
+const getPackageJson = require('eslint-plugin-n/lib/util/get-package-json');
 
-const packageJson = getPackageJson()
-const isModule = (packageJson && packageJson.type) === 'module'
+const packageJson = getPackageJson();
+const isModule = (packageJson && packageJson.type) === 'module';
 
 const customModuleConfig = {
   ...moduleConfig,
@@ -20,20 +20,20 @@ const customModuleConfig = {
     'n/no-missing-import': 'off',
     'n/no-unpublished-import': 'off',
   },
-}
+};
 
 const customScriptConfig = {
   ...scriptConfig,
   rules: {
     'n/no-unpublished-require': 'off',
   },
-}
+};
 
 const jsConfigs = [
   { ...(isModule ? customModuleConfig : customScriptConfig), files: ['*.js'] },
   { ...scriptConfig, files: ['*.cjs', '.*.cjs'] },
   { ...customModuleConfig, files: ['*.mjs', '.*.mjs', '*.esm.js'] },
-]
+];
 
 const tsConfigs = {
   extends: [
@@ -97,7 +97,7 @@ const tsConfigs = {
 
     'jsdoc/require-jsdoc': 'off',
   },
-}
+};
 
 const reactConfigs = {
   env: {
@@ -164,7 +164,7 @@ const reactConfigs = {
       version: 'detect',
     },
   },
-}
+};
 
 // NOTE: When adding rules here, you need to make sure they are compatible with `typescript-eslint`
 module.exports = {
@@ -419,7 +419,7 @@ module.exports = {
     'require-atomic-updates': 'error',
     'require-yield': 'error',
     'rest-spread-spacing': ['error', 'never'],
-    semi: ['error', 'never'],
+    semi: ['error', 'always'],
     'semi-spacing': 'error',
     'sort-imports': 'off',
     'space-before-blocks': 'error',
@@ -463,4 +463,4 @@ module.exports = {
     // https://github.com/leo-buneev/eslint-plugin-sort-keys-fix
     'sort-keys-fix/sort-keys-fix': ['error', 'asc'],
   },
-}
+};
