@@ -18,12 +18,14 @@
     "@mui/icons-material": "^5.15.15",
     "@mui/material": "^5.15.15",
     "@tauri-apps/api": "^1",
+    "dagre": "^0.8.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "reactflow": "^11.11.2"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^1",
+    "@types/dagre": "^0",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@typescript-eslint/eslint-plugin": "6.19.1",
