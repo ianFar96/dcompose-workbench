@@ -1,10 +1,12 @@
 import ReplayIcon from '@mui/icons-material/Replay';
+import { invoke } from '@tauri-apps/api';
 import dagre from 'dagre';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import type { Connection, Edge, Node } from 'reactflow';
 import { Background, ControlButton, Controls, MiniMap, Position, default as ReactFlow, addEdge, useEdgesState, useNodesState } from 'reactflow';
 
 import CustomNode from './components/CustomNode';
+import type { Scene } from './types/scene';
 
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
@@ -12,24 +14,11 @@ import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
 import 'reactflow/dist/style.css';
 
-const position = { x: 0, y: 0 };
-const initialNodes: Node[] = [
-  { data: { label: '1' }, id: '1', position, type: 'custom' },
-  { data: { label: '2' }, id: '2', position, type: 'custom' },
-  { data: { label: '3' }, id: '3', position, type: 'custom' },
-  { data: { label: '4' }, id: '4', position, type: 'custom' },
-];
-const initialEdges: Edge[] = [
-  { animated: true, id: 'e1-2', source: '1', target: '2' },
-  { animated: true, id: 'e1-3', source: '1', target: '3' },
-  { animated: true, id: 'e3-4', source: '3', target: '4' },
-];
-
 const dagreGraph = new dagre.graphlib.Graph();
 dagreGraph.setDefaultEdgeLabel(() => ({}));
 
-const nodeWidth = 172;
-const nodeHeight = 36;
+const nodeWidth = 208;
+const nodeHeight = 96;
 const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
   dagreGraph.setGraph({ rankdir: 'LR' });
 
@@ -61,16 +50,36 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
   return { edges, nodes };
 };
 
-const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
-  initialNodes,
-  initialEdges
-);
-
 export default function App() {
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
+  useEffect(() => {
+    invoke<Scene>('get_scene').then(scene => {
+      const sceneNodes: Node[] = scene.services.map(service => ({
+        data: {
+          label: service.type,
+          name: service.label,
+        },
+        id: service.id,
+        position: { x: 0, y: 0 },
+        type: 'custom',
+      }));
+
+      const sceneEdges: Edge[] = scene.relationships.map(relationship => ({
+        animated: true,
+        id: `e${relationship.source}-${relationship.target}`,
+        source: relationship.source,
+        target: relationship.target,
+      }));
+
+      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(sceneNodes, sceneEdges);
+
+      setNodes(layoutedNodes);
+      setEdges(layoutedEdges);
+    }).catch(console.error);
+  }, [setNodes, setEdges]);
 
   const onConnect = useCallback((connection: Connection) => {
     setEdges((eds) =>
