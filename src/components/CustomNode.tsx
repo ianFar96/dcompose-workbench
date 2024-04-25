@@ -23,11 +23,9 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
     invoke('run_service', {
       sceneName: props.data.sceneName,
       serviceId: props.data.serviceId,
-    }).then(() => {
-      setStatus('running');
     }).catch(error => {
+      // TODO: un bell'alert
       console.error(error);
-      setStatus('paused');
     });
   }, [props.data.sceneName, props.data.serviceId]);
 
@@ -37,11 +35,9 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
     invoke('stop_service', {
       sceneName: props.data.sceneName,
       serviceId: props.data.serviceId,
-    }).then(() => {
-      setStatus('paused');
     }).catch(error => {
+      // TODO: un bell'alert
       console.error(error);
-      setStatus('running');
     });
   }, [props.data.sceneName, props.data.serviceId]);
 

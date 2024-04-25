@@ -1,7 +1,8 @@
-use crate::docker_compose::{
-    get_docker_compose_file, run_docker_compose_down, run_docker_compose_up,
+use crate::docker::{
+    get_docker_compose_file, run_docker_compose_down, run_docker_compose_up, start_emitting_service_status,
 };
 use serde::{Deserialize, Serialize};
+use tauri::{App, AppHandle};
 
 #[derive(Deserialize, Serialize)]
 pub struct Service {
@@ -24,15 +25,17 @@ pub struct Scene {
 }
 
 #[tauri::command(async)]
-pub fn get_scene(scene_name: &str) -> Result<Scene, String> {
+pub fn get_scene(app: AppHandle, scene_name: &str) -> Result<Scene, String> {
     let docker_compose_file = get_docker_compose_file(scene_name)?;
     let mut services: Vec<Service> = vec![];
     for (service_id, service) in docker_compose_file.services {
         services.push(Service {
-            id: service_id,
+            id: service_id.clone(),
             label: service.labels.service_name,
             type_name: service.labels.service_type,
-        })
+        });
+
+        start_emitting_service_status(&app, scene_name, &service_id)?;
     }
 
     Ok(Scene {
