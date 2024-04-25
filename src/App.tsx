@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useMemo } from 'react';
 import type { Connection, Edge, Node } from 'reactflow';
 import { Background, ControlButton, Controls, MiniMap, Position, default as ReactFlow, addEdge, useEdgesState, useNodesState } from 'reactflow';
 
+import type { CustomNodeData } from './components/CustomNode';
 import CustomNode from './components/CustomNode';
 import type { Scene } from './types/scene';
 
@@ -55,12 +56,16 @@ export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
+  const sceneName = 'fast-data-example';
+
   useEffect(() => {
-    invoke<Scene>('get_scene').then(scene => {
-      const sceneNodes: Node[] = scene.services.map(service => ({
+    invoke<Scene>('get_scene', { sceneName }).then(scene => {
+      const sceneNodes: Node<CustomNodeData>[] = scene.services.map(service => ({
         data: {
-          label: service.type,
-          name: service.label,
+          sceneName,
+          serviceId: service.id,
+          serviceName: service.label,
+          serviceType: service.type,
         },
         id: service.id,
         position: { x: 0, y: 0 },

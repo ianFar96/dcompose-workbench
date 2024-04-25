@@ -5,7 +5,11 @@ use dcompose_workbench::commands;
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![commands::get_scene])
+        .invoke_handler(tauri::generate_handler![
+            commands::get_scene,
+            commands::run_service,
+            commands::stop_service
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
