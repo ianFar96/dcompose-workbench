@@ -1,8 +1,9 @@
 use crate::docker::{
-    get_docker_compose_file, run_docker_compose_down, run_docker_compose_up, start_emitting_service_status,
+    get_docker_compose_file, run_docker_compose_down, run_docker_compose_up,
+    start_emitting_service_status,
 };
 use serde::{Deserialize, Serialize};
-use tauri::{App, AppHandle};
+use tauri::AppHandle;
 
 #[derive(Deserialize, Serialize)]
 pub struct Service {

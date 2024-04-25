@@ -1,14 +1,17 @@
-use bollard::{container::InspectContainerOptions, secret::ContainerStateStatusEnum, Docker};
+use bollard::{
+    container::{InspectContainerOptions, ListContainersOptions},
+    secret::{ContainerState, ContainerStateStatusEnum, HealthStatusEnum},
+    Docker,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::Arc,
     time::Duration,
 };
-use tauri::{api::path::home_dir, App, AppHandle, Manager};
+use tauri::{api::path::home_dir, AppHandle, Manager};
 use tokio::{spawn, time::sleep};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -125,7 +128,7 @@ pub fn start_emitting_service_logs() {
     // });
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Clone)]
 pub enum ServiceStatus {
     #[serde(rename = "running")]
     Running,
@@ -134,7 +137,13 @@ pub enum ServiceStatus {
     #[serde(rename = "loading")]
     Loading,
     #[serde(rename = "error")]
-    Error(String),
+    Error,
+}
+
+#[derive(Serialize, Clone)]
+pub struct ServiceStatusEventPayload {
+    status: ServiceStatus,
+    message: Option<String>,
 }
 
 pub fn start_emitting_service_status(
@@ -152,48 +161,94 @@ pub fn start_emitting_service_status(
     // TODO: put handle in state
     let _status_handle = spawn(async move {
         loop {
-            let container = &docker
-                .inspect_container(
-                    container_name.as_ref(),
-                    Some(InspectContainerOptions { size: false }),
-                )
-                .await;
-
             let service_status_event_name = &format!("{container_name}-status-event");
-            match container {
-                Ok(container) => match &container.state {
-                    Some(state) => match state.status {
-                        Some(ContainerStateStatusEnum::CREATED)
-                        | Some(ContainerStateStatusEnum::REMOVING)
-                        | Some(ContainerStateStatusEnum::RESTARTING) => {
-                            app.emit_all(service_status_event_name, ServiceStatus::Loading)
+            match does_container_exist(&docker, &container_name).await {
+                Ok(true) => {
+                    let inspect_result = docker
+                        .inspect_container(
+                            container_name.as_ref(),
+                            Some(InspectContainerOptions { size: false }),
+                        )
+                        .await;
+
+                    match inspect_result {
+                        Ok(container) => match &container.state {
+                            Some(state) => match &state.health {
+                                Some(health) => match health.status {
+                                    Some(status) => match status {
+                                        HealthStatusEnum::EMPTY | HealthStatusEnum::NONE => {
+                                            emit_service_status_by_status(
+                                                &app,
+                                                state,
+                                                service_status_event_name,
+                                            )
+                                        }
+                                        status => {
+                                            app.emit_all(
+                                                service_status_event_name,
+                                                ServiceStatusEventPayload {
+                                                    status: get_service_status_from_health_status(status).unwrap(),
+                                                    message: Some(format!("Status: {}", status)),
+                                                },
+                                            )
+                                            .unwrap();
+                                        }
+                                    },
+                                    None => emit_service_status_by_status(
+                                        &app,
+                                        state,
+                                        service_status_event_name,
+                                    ),
+                                },
+                                None => emit_service_status_by_status(
+                                    &app,
+                                    state,
+                                    service_status_event_name,
+                                ),
+                            },
+                            None => {
+                                app.emit_all(
+                                    service_status_event_name,
+                                    ServiceStatusEventPayload {
+                                        status: ServiceStatus::Paused,
+                                        message: None,
+                                    },
+                                )
                                 .unwrap();
-                        }
-                        Some(ContainerStateStatusEnum::RUNNING) => {
-                            app.emit_all(service_status_event_name, ServiceStatus::Running)
-                                .unwrap();
-                        }
-                        Some(ContainerStateStatusEnum::DEAD)
-                        | Some(ContainerStateStatusEnum::EMPTY)
-                        | Some(ContainerStateStatusEnum::EXITED)
-                        | Some(ContainerStateStatusEnum::PAUSED)
-                        | None => {
-                            app.emit_all(service_status_event_name, ServiceStatus::Paused)
-                                .unwrap();
-                        }
-                    },
-                    None => {
-                        app.emit_all(service_status_event_name, ServiceStatus::Paused)
+                            }
+                        },
+                        Err(error) => {
+                            app.emit_all(
+                                service_status_event_name,
+                                ServiceStatusEventPayload {
+                                    status: ServiceStatus::Error,
+                                    message: Some(format!(
+                                        "Error while retrieving service status: {}",
+                                        error
+                                    )),
+                                },
+                            )
                             .unwrap();
+                        }
                     }
-                },
+                }
+                Ok(false) => {
+                    app.emit_all(
+                        service_status_event_name,
+                        ServiceStatusEventPayload {
+                            status: ServiceStatus::Paused,
+                            message: None,
+                        },
+                    )
+                    .unwrap();
+                }
                 Err(error) => {
                     app.emit_all(
                         service_status_event_name,
-                        ServiceStatus::Error(format!(
-                            "Error while retrieving service status: {}",
-                            error
-                        )),
+                        ServiceStatusEventPayload {
+                            status: ServiceStatus::Error,
+                            message: Some(error),
+                        },
                     )
                     .unwrap();
                 }
@@ -204,4 +259,91 @@ pub fn start_emitting_service_status(
     });
 
     Ok(())
+}
+
+async fn does_container_exist(docker: &Docker, container_name: &str) -> Result<bool, String> {
+    let mut filters = HashMap::new();
+    filters.insert("name", vec![container_name]);
+
+    let options = Some(ListContainersOptions {
+        all: true,
+        filters,
+        ..Default::default()
+    });
+
+    let response = docker
+        .list_containers(options)
+        .await
+        .map_err(|error| format!("Cannot retrieve conatiners list: {}", error))?;
+
+    Ok(!response.is_empty())
+}
+
+fn emit_service_status_by_status(
+    app: &AppHandle,
+    state: &ContainerState,
+    service_status_event_name: &str,
+) {
+    match state.status {
+        Some(ContainerStateStatusEnum::EXITED) => {
+            app.emit_all(
+                service_status_event_name,
+                ServiceStatusEventPayload {
+                    status: ServiceStatus::Paused,
+                    message: Some(format!(
+                        "Container has exited with exit code {}",
+                        state
+                            .exit_code
+                            .map(|exit_code| exit_code.to_string())
+                            .unwrap_or("Unknown".to_string())
+                    )),
+                },
+            )
+            .unwrap();
+        }
+        Some(status) => {
+            app.emit_all(
+                service_status_event_name,
+                ServiceStatusEventPayload {
+                    status: get_service_status_from_container_status(status),
+                    message: Some(format!("Status: {}", status)),
+                },
+            )
+            .unwrap();
+        }
+        None => {
+            app.emit_all(
+                service_status_event_name,
+                ServiceStatusEventPayload {
+                    status: ServiceStatus::Paused,
+                    message: None,
+                },
+            )
+            .unwrap();
+        }
+    }
+}
+
+fn get_service_status_from_container_status(
+    conatiner_status: ContainerStateStatusEnum,
+) -> ServiceStatus {
+    match conatiner_status {
+        ContainerStateStatusEnum::CREATED
+        | ContainerStateStatusEnum::REMOVING
+        | ContainerStateStatusEnum::RESTARTING => ServiceStatus::Loading,
+        ContainerStateStatusEnum::RUNNING => ServiceStatus::Running,
+        ContainerStateStatusEnum::EXITED
+        | ContainerStateStatusEnum::DEAD
+        | ContainerStateStatusEnum::EMPTY
+        | ContainerStateStatusEnum::PAUSED => ServiceStatus::Paused,
+    }
+}
+
+fn get_service_status_from_health_status(health_status: HealthStatusEnum) -> Option<ServiceStatus> {
+    match health_status {
+        HealthStatusEnum::HEALTHY => Some(ServiceStatus::Running),
+        HealthStatusEnum::UNHEALTHY => Some(ServiceStatus::Error),
+        HealthStatusEnum::STARTING => Some(ServiceStatus::Loading),
+        HealthStatusEnum::EMPTY | HealthStatusEnum::NONE => None,
+    }
 }

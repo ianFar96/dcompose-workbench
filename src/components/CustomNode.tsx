@@ -1,7 +1,9 @@
-import { Pause, PlayArrow, Refresh } from '@mui/icons-material';
+import { Error, Pause, PlayArrow, QuestionMark, Refresh } from '@mui/icons-material';
 import { Button, Card, CardContent, Chip, Typography } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
-import React, { useCallback, useMemo, useState } from 'react';
+import type { UnlistenFn } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NodeProps } from 'reactflow';
 import { Handle, Position } from 'reactflow';
 
@@ -12,10 +14,33 @@ export type CustomNodeData = {
   serviceType: string
 }
 
-type ServiceStatus = 'paused' | 'running' | 'loading'
+type ServiceStatus = 'paused' | 'running' | 'loading' | 'error' | 'unknown'
+type StatusEventPayload = {
+  status: ServiceStatus
+  message?: string
+}
 
 export default function CustomNode(props: NodeProps<CustomNodeData>) {
-  const [status, setStatus] = useState<ServiceStatus>('paused');
+  const [status, setStatus] = useState<ServiceStatus>('unknown');
+  const [statusText, setStatusText] = useState<string | undefined>();
+
+  useEffect(() => {
+    const eventName = `${props.data.sceneName}-${props.data.serviceId}-status-event`;
+    const unlistenPromise = listen<StatusEventPayload>(eventName, event => {
+      console.log({ payload: event.payload });
+
+      setStatus(event.payload.status);
+      setStatusText(event.payload.message);
+    });
+
+    let unlisten: UnlistenFn | undefined;
+    unlistenPromise.then(unlistenFn => { unlisten = unlistenFn; })
+      .catch(error => {
+        // TODO: un bell'alert
+        console.error(error);
+      });
+    return () => { unlisten?.(); };
+  }, [props.data.sceneName, props.data.serviceId]);
 
   const run = useCallback(() => {
     setStatus('loading');
@@ -45,24 +70,62 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
     switch (status) {
     case 'paused':
       return (
-        <Button className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0' onClick={run} variant='outlined'>
+        <Button
+          className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
+          onClick={run}
+          title={statusText}
+          variant='outlined'
+        >
           <PlayArrow fontSize='small' />
         </Button>
       );
     case 'running':
       return (
-        <Button className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0' onClick={stop} variant='outlined'>
+        <Button
+          className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
+          onClick={stop}
+          title={statusText}
+          variant='outlined'
+        >
           <Pause fontSize='small' />
         </Button>
       );
     case 'loading':
       return (
-        <Button className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0' disabled variant='outlined'>
+        <Button
+          className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
+          onClick={stop}
+          title={statusText}
+          variant='outlined'
+        >
           <Refresh className='animate-spin' fontSize='small' />
         </Button>
       );
+    case 'error':
+      return (
+        <Button
+          className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
+          color='error'
+          onClick={stop}
+          title={statusText}
+          variant='outlined'
+        >
+          <Error fontSize='small' />
+        </Button>
+      );
+    case 'unknown':
+      return (
+        <Button
+          className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
+          disabled
+          title={statusText}
+          variant='outlined'
+        >
+          <QuestionMark fontSize='small' />
+        </Button>
+      );
     }
-  }, [run, status, stop]);
+  }, [run, status, statusText, stop]);
 
   return (
     <>
