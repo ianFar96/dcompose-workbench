@@ -1,18 +1,22 @@
 use bollard::{
-    container::{InspectContainerOptions, ListContainersOptions},
+    container::{InspectContainerOptions, ListContainersOptions, LogOutput, LogsOptions},
     secret::{ContainerState, ContainerStateStatusEnum, HealthStatusEnum},
     Docker,
 };
+use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::Arc,
     time::Duration,
 };
-use tauri::{api::path::home_dir, AppHandle, Manager};
+use tauri::{api::path::home_dir, AppHandle, Manager, State};
 use tokio::{spawn, time::sleep};
+
+use crate::{state::AppState, utils::get_now_iso_8601};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DockerComposeLabels {
@@ -100,36 +104,175 @@ pub fn run_docker_compose_down(scene_name: &str, service_id: &str) -> Result<(),
     }
 }
 
-pub fn start_emitting_service_logs() {
-    // let arc_docker_clone = arc_docker.clone();
-    // let arc_container_name_clone = arc_container_name.clone();
-    // let logs_handle = spawn(async move {
-    //     let logs = &arc_docker_clone
-    //         .logs(
-    //             arc_container_name_clone.as_ref(),
-    //             Some(LogsOptions::<String> {
-    //                 stderr: true,
-    //                 stdout: true,
-    //                 timestamps: true,
-    //                 ..Default::default()
-    //             }),
-    //         )
-    //         .try_collect::<Vec<_>>()
-    //         .await
-    //         .unwrap();
-
-    //     for log in logs {
-    //         match log {
-    //             LogOutput::StdErr { message: _ } => println!("Error: {}", log),
-    //             LogOutput::StdIn { message: _ } => println!("{}", log),
-    //             _ => {}
-    //         }
-    //     }
-    // });
+#[derive(Serialize, Clone)]
+enum LogType {
+    #[serde(rename = "stderr")]
+    StdErr,
+    #[serde(rename = "stdout")]
+    StdOut,
 }
 
 #[derive(Serialize, Clone)]
-pub enum ServiceStatus {
+struct ServiceLogEventPayload {
+    text: String,
+    timestamp: String,
+    #[serde(rename = "type")]
+    type_name: LogType,
+    clear: bool,
+}
+
+pub async fn start_emitting_service_logs(
+    app: &AppHandle,
+    scene_name: &str,
+    service_id: &str,
+) -> Result<(), String> {
+    let docker = Docker::connect_with_socket_defaults()
+        .map_err(|error| format!("Cannot connect to docker socket: {}", error))?;
+
+    let container_name = format!("{}-{}", scene_name, service_id);
+    let arc_container_name = Arc::new(container_name);
+
+    let thread_app = app.to_owned();
+    let thread_container_name = arc_container_name.clone();
+    let logs_handle = spawn(async move {
+        let service_log_event_name = format!("{thread_container_name}-log-event");
+
+        loop {
+            match does_container_exist(&docker, &thread_container_name).await {
+                Ok(true) => break,
+                Ok(false) => {
+                    thread_app
+                        .emit_all(
+                            service_log_event_name.as_ref(),
+                            ServiceLogEventPayload {
+                                text: "Container does not exist for this service...".to_string(),
+                                timestamp: get_now_iso_8601(),
+                                clear: true,
+                                type_name: LogType::StdErr,
+                            },
+                        )
+                        .unwrap();
+                }
+                Err(error) => {
+                    thread_app
+                        .emit_all(
+                            service_log_event_name.as_ref(),
+                            ServiceLogEventPayload {
+                                text: format!("Could not retrieve service logs: {}", error),
+                                timestamp: get_now_iso_8601(),
+                                clear: true,
+                                type_name: LogType::StdErr,
+                            },
+                        )
+                        .unwrap();
+                }
+            }
+
+            sleep(Duration::from_secs(1)).await;
+        }
+
+        let logs_response = docker
+            .logs(
+                &thread_container_name,
+                Some(LogsOptions::<String> {
+                    stderr: true,
+                    stdout: true,
+                    timestamps: true,
+                    ..Default::default()
+                }),
+            )
+            .try_collect::<Vec<_>>()
+            .await;
+
+        match logs_response {
+            Ok(logs) => {
+                for log in logs {
+                    let log_string = log.to_string();
+                    let (timestamp, text) = match log_string.split_once(' ') {
+                        None => ("".to_string(), log_string),
+                        Some((timestamp, text)) => (timestamp.to_string(), text.to_string()),
+                    };
+
+                    match log {
+                        LogOutput::StdOut { message: _ } => {
+                            thread_app
+                                .emit_all(
+                                    service_log_event_name.as_ref(),
+                                    ServiceLogEventPayload {
+                                        text,
+                                        timestamp,
+                                        clear: false,
+                                        type_name: LogType::StdOut,
+                                    },
+                                )
+                                .unwrap();
+                        }
+                        LogOutput::StdErr { message: _ } => {
+                            thread_app
+                                .emit_all(
+                                    service_log_event_name.as_ref(),
+                                    ServiceLogEventPayload {
+                                        text,
+                                        timestamp,
+                                        clear: false,
+                                        type_name: LogType::StdErr,
+                                    },
+                                )
+                                .unwrap();
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Err(error) => {
+                thread_app
+                    .emit_all(
+                        service_log_event_name.as_ref(),
+                        ServiceLogEventPayload {
+                            text: format!("Logs stream interrupted: {}", error),
+                            timestamp: get_now_iso_8601(),
+                            clear: true,
+                            type_name: LogType::StdErr,
+                        },
+                    )
+                    .unwrap();
+            }
+        }
+    });
+
+    let state = app.state::<AppState>();
+    state
+        .container_log_handles
+        .lock()
+        .await
+        .insert(arc_container_name.to_string(), logs_handle);
+
+    Ok(())
+}
+
+pub async fn stop_emitting_service_logs(
+    state: State<'_, AppState>,
+    scene_name: &str,
+    service_id: &str,
+) -> Result<(), String> {
+    let container_name = format!("{}-{}", scene_name, service_id);
+    let container_log_handles = state.container_log_handles.lock().await;
+    let log_handle = container_log_handles.get(&container_name);
+
+    match log_handle {
+        Some(log_handle) => {
+            log_handle.abort();
+            Ok(())
+        }
+        None => Err(format!(
+            "Could not find the log emitting process for {}",
+            container_name
+        )),
+    }
+}
+
+#[derive(Serialize, Clone)]
+enum ServiceStatus {
     #[serde(rename = "running")]
     Running,
     #[serde(rename = "paused")]
@@ -141,7 +284,7 @@ pub enum ServiceStatus {
 }
 
 #[derive(Serialize, Clone)]
-pub struct ServiceStatusEventPayload {
+struct ServiceStatusEventPayload {
     status: ServiceStatus,
     message: Option<String>,
 }
@@ -151,7 +294,6 @@ pub fn start_emitting_service_status(
     scene_name: &str,
     service_id: &str,
 ) -> Result<(), String> {
-    // TODO: out this in state
     let docker = Docker::connect_with_socket_defaults()
         .map_err(|error| format!("Cannot connect to docker socket: {}", error))?;
 
@@ -187,7 +329,10 @@ pub fn start_emitting_service_status(
                                             app.emit_all(
                                                 service_status_event_name,
                                                 ServiceStatusEventPayload {
-                                                    status: get_service_status_from_health_status(status).unwrap(),
+                                                    status: get_service_status_from_health_status(
+                                                        status,
+                                                    )
+                                                    .unwrap(),
                                                     message: Some(format!("Status: {}", status)),
                                                 },
                                             )
