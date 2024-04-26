@@ -1,11 +1,13 @@
 import { Error, Pause, PlayArrow, QuestionMark, Refresh } from '@mui/icons-material';
-import { Button, Card, CardContent, Chip, Typography } from '@mui/material';
+import { Button, Card, CardContent, Chip, Drawer, Typography } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { listen } from '@tauri-apps/api/event';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NodeProps } from 'reactflow';
 import { Handle, Position } from 'reactflow';
+
+import NodeDrawer from './NodeDrawer';
 
 export type CustomNodeData = {
   sceneName: string
@@ -27,8 +29,6 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
   useEffect(() => {
     const eventName = `${props.data.sceneName}-${props.data.serviceId}-status-event`;
     const unlistenPromise = listen<StatusEventPayload>(eventName, event => {
-      console.log({ payload: event.payload });
-
       setStatus(event.payload.status);
       setStatusText(event.payload.message);
     });
@@ -127,11 +127,13 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
     }
   }, [run, status, statusText, stop]);
 
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
   return (
     <>
       {actionButton}
 
-      <Card className='h-24 w-52' variant='elevation'>
+      <Card className='h-24 w-52' onClick={() => setIsDrawerOpen(true)} variant='elevation'>
         <CardContent className='relative h-full'>
           <Typography component='span' variant='h5'>
             {props.data.serviceName}
@@ -140,6 +142,14 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
 
         </CardContent>
       </Card>
+
+      <Drawer
+        anchor='right'
+        onClose={() => setIsDrawerOpen(false)}
+        open={isDrawerOpen}
+      >
+        <NodeDrawer sceneName={props.data.sceneName} serviceId={props.data.serviceId} />
+      </Drawer>
 
       <Handle position={Position.Left} type='target' />
       <Handle position={Position.Right} type='source' />
