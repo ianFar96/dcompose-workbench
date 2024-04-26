@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { listen } from '@tauri-apps/api/event';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 type ServiceLogsProps = {
   serviceId: string
@@ -54,14 +54,26 @@ export default function ServiceLogs(props: ServiceLogsProps) {
     };
   }, [props.sceneName, props.serviceId]);
 
+  const tryJsonDisplay = useCallback((text: string) => {
+    try {
+      return JSON.stringify(JSON.parse(text), null, 4);
+    } catch (error) {
+      return text;
+    }
+  }, []);
+
   return (
-    <>
-      {logs.map(log => (
-        <>
-          <p className={log.type === 'stderr' ? 'text-red-600' : ''}>{log.text}</p>
-          <p className='text-gray-600'>{log.timestamp}</p>
-        </>
-      ))}
-    </>
+    <table className='bg-black overflow-auto h-full w-full'>
+      <tbody>
+        {logs.map(log => (
+          <tr className='text-sm align-top'>
+            <td className='text-gray-600 whitespace-nowrap px-4'>{log.timestamp}</td>
+            <td className={`${log.type === 'stderr' ? 'text-red-600' : 'text-white'} whitespace-pre-wrap pl-0 px-4`}>
+              {tryJsonDisplay(log.text)}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

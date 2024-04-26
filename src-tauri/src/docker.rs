@@ -3,6 +3,7 @@ use bollard::{
     secret::{ContainerState, ContainerStateStatusEnum, HealthStatusEnum},
     Docker,
 };
+use chrono::DateTime;
 use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -16,7 +17,7 @@ use std::{
 use tauri::{api::path::home_dir, AppHandle, Manager, State};
 use tokio::{spawn, time::sleep};
 
-use crate::{state::AppState, utils::get_now_iso_8601};
+use crate::{state::AppState, utils::get_formatted_date};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DockerComposeLabels {
@@ -146,7 +147,7 @@ pub async fn start_emitting_service_logs(
                             service_log_event_name.as_ref(),
                             ServiceLogEventPayload {
                                 text: "Container does not exist for this service...".to_string(),
-                                timestamp: get_now_iso_8601(),
+                                timestamp: get_formatted_date(None),
                                 clear: true,
                                 type_name: LogType::StdErr,
                             },
@@ -159,7 +160,7 @@ pub async fn start_emitting_service_logs(
                             service_log_event_name.as_ref(),
                             ServiceLogEventPayload {
                                 text: format!("Could not retrieve service logs: {}", error),
-                                timestamp: get_now_iso_8601(),
+                                timestamp: get_formatted_date(None),
                                 clear: true,
                                 type_name: LogType::StdErr,
                             },
@@ -190,7 +191,14 @@ pub async fn start_emitting_service_logs(
                     let log_string = log.to_string();
                     let (timestamp, text) = match log_string.split_once(' ') {
                         None => ("".to_string(), log_string),
-                        Some((timestamp, text)) => (timestamp.to_string(), text.to_string()),
+                        Some((timestamp, text)) => (
+                            get_formatted_date(
+                                DateTime::parse_from_rfc3339(timestamp)
+                                    .map(|date| date.into())
+                                    .ok(),
+                            ),
+                            text.to_string(),
+                        ),
                     };
 
                     match log {
@@ -230,7 +238,7 @@ pub async fn start_emitting_service_logs(
                         service_log_event_name.as_ref(),
                         ServiceLogEventPayload {
                             text: format!("Logs stream interrupted: {}", error),
-                            timestamp: get_now_iso_8601(),
+                            timestamp: get_formatted_date(None),
                             clear: true,
                             type_name: LogType::StdErr,
                         },

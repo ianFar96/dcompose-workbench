@@ -18,24 +18,30 @@ export default function NodeDrawer(props: NodeDrawerProps) {
     switch (page) {
     case 'logs':
       return (
-        <>
-          <Button
-            className='w-6 h-6 min-w-[unset] p-0 outline-none border-none'
-            color='inherit'
-            onClick={() => setPage(undefined)}
-            title='Go back'
-            variant='outlined'
-          >
-            <ArrowBack fontSize='small' />
-          </Button>
+        <Box className='max-w-[75vw] h-screen flex flex-col' role='presentation'>
+          <div className='flex items-center px-3 py-2'>
+            <Button
+              className='w-6 h-6 min-w-[unset] p-0 outline-none border-none mr-2'
+              color='inherit'
+              onClick={() => setPage(undefined)}
+              title='Go back'
+              variant='outlined'
+            >
+              <ArrowBack fontSize='small' />
+            </Button>
+            <span className='text-xl'>{props.serviceId}</span>
+          </div>
           <ServiceLogs sceneName={props.sceneName} serviceId={props.serviceId} />
-        </>
+        </Box>
       );
 
     case undefined:
     default:
       return (
         <Box className='w-52' role='presentation'>
+          <div className='flex items-center px-3 py-2'>
+            <span className='text-xl'>{props.serviceId}</span>
+          </div>
           <List>
             <ListItem disablePadding>
               <ListItemButton onClick={() => setPage('logs')}>

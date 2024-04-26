@@ -1,9 +1,11 @@
 use std::time::SystemTime;
 
-use chrono::{DateTime, Utc, };
+use chrono::{DateTime, Utc};
 
-pub fn get_now_iso_8601() -> String {
-    let now = SystemTime::now();
-    let now: DateTime<Utc> = now.into();
-    now.to_rfc3339()
+pub fn get_formatted_date(date: Option<DateTime<Utc>>) -> String {
+    let date: DateTime<Utc> = match date {
+        None => SystemTime::now().into(),
+        Some(x) => x,
+    };
+    date.format("%d/%m/%Y %H:%M:%S").to_string()
 }
