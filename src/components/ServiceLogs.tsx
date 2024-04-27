@@ -1,3 +1,4 @@
+import { useDebouncedState } from '@mantine/hooks';
 import { invoke } from '@tauri-apps/api';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { listen } from '@tauri-apps/api/event';
@@ -23,6 +24,7 @@ type Log = {
 
 export default function ServiceLogs(props: ServiceLogsProps) {
   const [logs, setLogs] = useState<Log[]>([]);
+  const [debouncedLogs, setDeboucesLogs] = useDebouncedState<Log[]>([], 500);
 
   useEffect(() => {
     const eventName = `${props.sceneName}-${props.serviceId}-log-event`;
@@ -52,7 +54,11 @@ export default function ServiceLogs(props: ServiceLogsProps) {
 
       unlisten?.();
     };
-  }, [props.sceneName, props.serviceId]);
+  }, [props.sceneName, props.serviceId, setLogs]);
+
+  useEffect(() => {
+    setDeboucesLogs(logs);
+  }, [logs, setDeboucesLogs]);
 
   const tryJsonDisplay = useCallback((text: string) => {
     try {
@@ -63,17 +69,15 @@ export default function ServiceLogs(props: ServiceLogsProps) {
   }, []);
 
   return (
-    <table className='bg-black overflow-auto h-full w-full'>
-      <tbody>
-        {logs.map((log, index) => (
-          <tr className='text-sm align-top' key={index}>
-            <td className='text-gray-600 whitespace-nowrap px-4'>{log.timestamp}</td>
-            <td className={`${log.type === 'stderr' ? 'text-red-600' : 'text-white'} whitespace-pre-wrap pl-0 px-4`}>
-              {tryJsonDisplay(log.text)}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className='bg-black overflow-auto h-full w-full py-4'>
+      {debouncedLogs.map((log, index) => (
+        <span
+          className={`${log.type === 'stderr' ? 'text-red-600' : 'text-white'} whitespace-pre-wrap text-sm px-4 block`}
+          key={index}
+          title={log.timestamp}>
+          {tryJsonDisplay(log.text)}
+        </span>
+      ))}
+    </div>
   );
 }
