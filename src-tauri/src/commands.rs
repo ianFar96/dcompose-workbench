@@ -1,6 +1,6 @@
 use crate::{docker::{
     self, get_docker_compose_file, run_docker_compose_down, run_docker_compose_up, start_emitting_service_status
-}, state::AppState};
+}, relationships::get_relationships, state::AppState};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
@@ -38,10 +38,11 @@ pub fn get_scene(app: AppHandle, scene_name: &str) -> Result<Scene, String> {
         start_emitting_service_status(&app, scene_name, &service_id)?;
     }
 
+    let relationships = get_relationships(scene_name)?;
+
     Ok(Scene {
         services,
-        // TODO:
-        relationships: vec![],
+        relationships,
     })
 }
 

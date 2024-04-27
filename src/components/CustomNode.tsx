@@ -134,12 +134,11 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
       {actionButton}
 
       <Card className='h-24 w-52' onClick={() => setIsDrawerOpen(true)} variant='elevation'>
-        <CardContent className='relative h-full'>
-          <Typography component='span' variant='h5'>
+        <CardContent className='relative h-full overflow-hidden whitespace-nowrap text-ellipsis'>
+          <Typography component='span' title={props.data.serviceName} variant='h5'>
             {props.data.serviceName}
           </Typography>
           <Chip className='absolute bottom-2 left-3' color='primary' label={props.data.serviceType} size='small' variant='outlined' />
-
         </CardContent>
       </Card>
 
