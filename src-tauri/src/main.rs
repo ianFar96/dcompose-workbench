@@ -13,6 +13,8 @@ async fn main() {
             commands::stop_service,
             commands::start_emitting_service_logs,
             commands::stop_emitting_service_logs,
+            commands::create_relationship,
+            commands::delete_relationship,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

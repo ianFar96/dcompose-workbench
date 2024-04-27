@@ -87,9 +87,27 @@ export default function App() {
   }, [setNodes, setEdges]);
 
   const onConnect = useCallback((connection: Connection) => {
-    setEdges((eds) =>
-      addEdge({ ...connection, animated: true }, eds)
-    );
+    invoke('create_relationship', { sceneName, source: connection.source, target: connection.target })
+      .then(() => {
+        setEdges((edges) => addEdge({ ...connection, animated: true }, edges));
+      })
+      .catch(error => {
+        // TODO: un bell'alert
+        console.error(error);
+      });
+  }, [setEdges]);
+
+  const onEdgesDelete = useCallback((edgesToDelete: Edge[]) => {
+    for (const edge of edgesToDelete) {
+      invoke('delete_relationship', { sceneName, source: edge.source, target: edge.target })
+        .then(() => {
+          setEdges(edges => edges.filter(edge => !edgesToDelete.includes(edge)));
+        })
+        .catch(error => {
+        // TODO: un bell'alert
+          console.error(error);
+        });
+    }
   }, [setEdges]);
 
   const onLayout = useCallback(() => {
@@ -108,6 +126,7 @@ export default function App() {
           nodes={nodes}
           onConnect={onConnect}
           onEdgesChange={onEdgesChange}
+          onEdgesDelete={onEdgesDelete}
           onNodesChange={onNodesChange}
         >
           <Background />
