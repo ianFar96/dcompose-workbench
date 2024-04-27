@@ -65,8 +65,8 @@ export default function ServiceLogs(props: ServiceLogsProps) {
   return (
     <table className='bg-black overflow-auto h-full w-full'>
       <tbody>
-        {logs.map(log => (
-          <tr className='text-sm align-top'>
+        {logs.map((log, index) => (
+          <tr className='text-sm align-top' key={index}>
             <td className='text-gray-600 whitespace-nowrap px-4'>{log.timestamp}</td>
             <td className={`${log.type === 'stderr' ? 'text-red-600' : 'text-white'} whitespace-pre-wrap pl-0 px-4`}>
               {tryJsonDisplay(log.text)}
