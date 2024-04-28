@@ -72,12 +72,17 @@ export default function App() {
         type: 'custom',
       }));
 
-      const sceneEdges: Edge[] = scene.relationships.map(relationship => ({
-        animated: true,
-        id: `e${relationship.source}-${relationship.target}`,
-        source: relationship.source,
-        target: relationship.target,
-      }));
+      const sceneEdges: Edge[] = [];
+      for (const service of scene.services) {
+        for (const targetServiceId of Object.keys(service.dependsOn)) {
+          sceneEdges.push({
+            animated: true,
+            id: `e${targetServiceId}-${service.id}`,
+            source: targetServiceId,
+            target: service.id,
+          });
+        }
+      }
 
       const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(sceneNodes, sceneEdges);
 
@@ -87,7 +92,7 @@ export default function App() {
   }, [setNodes, setEdges]);
 
   const onConnect = useCallback((connection: Connection) => {
-    invoke('create_relationship', { sceneName, source: connection.source, target: connection.target })
+    invoke('create_dependency', { sceneName, source: connection.source, target: connection.target })
       .then(() => {
         setEdges((edges) => addEdge({ ...connection, animated: true }, edges));
       })
@@ -99,7 +104,7 @@ export default function App() {
 
   const onEdgesDelete = useCallback((edgesToDelete: Edge[]) => {
     for (const edge of edgesToDelete) {
-      invoke('delete_relationship', { sceneName, source: edge.source, target: edge.target })
+      invoke('delete_dependency', { sceneName, source: edge.source, target: edge.target })
         .then(() => {
           setEdges(edges => edges.filter(edge => !edgesToDelete.includes(edge)));
         })

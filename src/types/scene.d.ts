@@ -2,14 +2,13 @@ export type Service = {
   id: string
   label: string
   type: string
+  dependsOn: Record<string, ServiceDependency>
 }
 
-export type ServiceRelationship = {
-  source: string
-  target: string
+export type ServiceDependency = {
+  condition: string
 }
 
 export type Scene = {
   services: Service[]
-  relationships: ServiceRelationship[]
 }

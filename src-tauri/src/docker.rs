@@ -6,6 +6,7 @@ use bollard::{
 use chrono::DateTime;
 use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
 use std::{
     collections::HashMap,
     fs,
@@ -25,16 +26,51 @@ pub struct DockerComposeLabels {
     pub service_name: String,
     #[serde(rename = "serviceType")]
     pub service_type: String,
+
+    #[serde(flatten)]
+    extra: HashMap<String, Value>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct DockerComposeDependsOn {
+    pub condition: String,
+
+    #[serde(flatten)]
+    extra: HashMap<String, Value>,
+}
+
+impl Default for DockerComposeDependsOn {
+    fn default() -> Self {
+        Self {
+            condition: "service_started".to_string(),
+            extra: HashMap::new(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DockerComposeService {
     pub labels: DockerComposeLabels,
+    #[serde(skip_serializing_if = "is_none_or_empty")]
+    pub depends_on: Option<HashMap<String, DockerComposeDependsOn>>,
+
+    #[serde(flatten)]
+    extra: HashMap<String, Value>,
+}
+
+fn is_none_or_empty(depends_on: &Option<HashMap<String, DockerComposeDependsOn>>) -> bool {
+    match depends_on {
+        None => true,
+        Some(x) => x.is_empty(),
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DockerComposeFile {
     pub services: HashMap<String, DockerComposeService>,
+
+    #[serde(flatten)]
+    extra: HashMap<String, Value>,
 }
 
 fn get_docker_compose_dirpath(scene_name: &str) -> PathBuf {
@@ -499,4 +535,69 @@ fn get_service_status_from_health_status(health_status: HealthStatusEnum) -> Opt
         HealthStatusEnum::STARTING => Some(ServiceStatus::Loading),
         HealthStatusEnum::EMPTY | HealthStatusEnum::NONE => None,
     }
+}
+
+pub fn add_dependency(scene_name: &str, service_id: &str, depends_on: &str) -> Result<(), String> {
+    let mut docker_compose = get_docker_compose_file(scene_name)?;
+
+    let service = docker_compose
+        .services
+        .get_mut(service_id)
+        .ok_or(format!("Cannot find service {service_id} in storage"))?;
+
+    let dependencies = match service.depends_on.as_mut() {
+        None => {
+            let _ = service.depends_on.insert(HashMap::new());
+            service.depends_on.as_mut().unwrap()
+        }
+        Some(x) => x,
+    };
+
+    dependencies.insert(
+        depends_on.to_string(),
+        DockerComposeDependsOn {
+            ..Default::default()
+        },
+    );
+
+    let docker_compose_filepath = get_docker_compose_dirpath(scene_name).join("docker-compose.yml");
+
+    let docker_compose_stringified = serde_yaml::to_string(&docker_compose).unwrap();
+    fs::write(&docker_compose_filepath, docker_compose_stringified)
+        .map_err(|err| format!("Cannot write file {:?}: {}", docker_compose_filepath, err))?;
+
+    Ok(())
+}
+
+pub fn remove_dependency(
+    scene_name: &str,
+    service_id: &str,
+    depends_on: &str,
+) -> Result<(), String> {
+    let mut docker_compose = get_docker_compose_file(scene_name)?;
+
+    let service_depends_on = docker_compose
+        .services
+        .get_mut(service_id)
+        .ok_or(format!("Cannot find service {service_id} in storage"))?
+        .depends_on
+        .as_mut();
+
+    match service_depends_on {
+        None => {}
+        Some(x) => match x.remove(depends_on) {
+            None => {}
+            Some(_) => {
+                let docker_compose_filepath =
+                    get_docker_compose_dirpath(scene_name).join("docker-compose.yml");
+
+                let docker_compose_stringified = serde_yaml::to_string(&docker_compose).unwrap();
+                fs::write(&docker_compose_filepath, docker_compose_stringified).map_err(|err| {
+                    format!("Cannot write file {:?}: {}", docker_compose_filepath, err)
+                })?;
+            }
+        },
+    }
+
+    Ok(())
 }
