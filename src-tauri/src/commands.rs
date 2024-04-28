@@ -71,13 +71,23 @@ pub fn get_scene(app: AppHandle, scene_name: &str) -> Result<Scene, String> {
 }
 
 #[tauri::command(async)]
+pub fn run_scene(scene_name: &str) -> Result<(), String> {
+    docker::run_docker_compose_up(scene_name, None)
+}
+
+#[tauri::command(async)]
+pub fn stop_scene(scene_name: &str) -> Result<(), String> {
+    docker::run_docker_compose_down(scene_name, None)
+}
+
+#[tauri::command(async)]
 pub fn run_service(scene_name: &str, service_id: &str) -> Result<(), String> {
-    docker::run_docker_compose_up(scene_name, service_id)
+    docker::run_docker_compose_up(scene_name, Some(service_id))
 }
 
 #[tauri::command(async)]
 pub fn stop_service(scene_name: &str, service_id: &str) -> Result<(), String> {
-    docker::run_docker_compose_down(scene_name, service_id)
+    docker::run_docker_compose_down(scene_name, Some(service_id))
 }
 
 #[tauri::command(async)]

@@ -9,6 +9,8 @@ async fn main() {
         .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
             commands::get_scene,
+            commands::run_scene,
+            commands::stop_scene,
             commands::run_service,
             commands::stop_service,
             commands::start_emitting_service_logs,

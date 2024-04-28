@@ -18,8 +18,8 @@ export default function NodeDrawer(props: NodeDrawerProps) {
     switch (page) {
     case 'logs':
       return (
-        <Box className='max-w-[75vw] h-screen flex flex-col' role='presentation'>
-          <div className='flex items-center px-3 py-2'>
+        <Box className='max-w-[75vw] min-w-52 h-screen flex flex-col' role='presentation'>
+          <div className='flex items-center px-4 py-3'>
             <Button
               className='w-6 h-6 min-w-[unset] p-0 outline-none border-none mr-2'
               color='inherit'
@@ -38,9 +38,9 @@ export default function NodeDrawer(props: NodeDrawerProps) {
     case undefined:
     default:
       return (
-        <Box className='w-52' role='presentation'>
-          <div className='flex items-center px-3 py-2'>
-            <span className='text-xl'>{props.serviceId}</span>
+        <Box className='min-w-52' role='presentation'>
+          <div className='px-4 py-3'>
+            <span className='text-xl whitespace-nowrap'>{props.serviceId}</span>
           </div>
           <List>
             <ListItem disablePadding>

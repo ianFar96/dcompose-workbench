@@ -1,4 +1,6 @@
+import { PlayArrow, Stop } from '@mui/icons-material';
 import ReplayIcon from '@mui/icons-material/Replay';
+import { Button } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
 import dagre from 'dagre';
 import React, { useCallback, useEffect, useMemo } from 'react';
@@ -121,6 +123,22 @@ export default function App() {
     setEdges([...layoutedEdges]);
   }, [nodes, edges, setNodes, setEdges]);
 
+  const startAll = useCallback(() => {
+    invoke('run_scene', { sceneName })
+      .catch(error => {
+        // TODO: un bell'alert
+        console.error(error);
+      });
+  }, []);
+
+  const stopAll = useCallback(() => {
+    invoke('stop_scene', { sceneName })
+      .catch(error => {
+        // TODO: un bell'alert
+        console.error(error);
+      });
+  }, []);
+
   return (
     <>
       <div style={{ height: '100vh', width: '100vw' }}>
@@ -142,6 +160,26 @@ export default function App() {
             </ControlButton>
           </Controls>
         </ReactFlow>
+      </div>
+
+      <div className='fixed top-4 right-4'>
+        <Button
+          className='w-10 h-10 min-w-[unset] p-0 mr-2'
+          onClick={startAll}
+          title='Start all services'
+          variant='outlined'
+        >
+          <PlayArrow fontSize='large' />
+        </Button>
+
+        <Button
+          className='w-10 h-10 min-w-[unset] p-0'
+          onClick={stopAll}
+          title='Start all services'
+          variant='outlined'
+        >
+          <Stop fontSize='large' />
+        </Button>
       </div>
     </>
   );

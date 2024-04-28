@@ -89,17 +89,26 @@ pub fn get_docker_compose_file(scene_name: &str) -> Result<DockerComposeFile, St
         .map_err(|err| format!("Cannot parse docker-compose.yml: {}", err))
 }
 
-pub fn run_docker_compose_up(scene_name: &str, service_id: &str) -> Result<(), String> {
+pub fn run_docker_compose_up(scene_name: &str, service_id: Option<&str>) -> Result<(), String> {
+    let args: Vec<&str> = match service_id {
+        None => ["up"].to_vec(),
+        Some(x) => ["up", x].to_vec(),
+    };
+
+    let service_id_format_string = service_id
+        .map(|service_id| format!(" {service_id}"))
+        .unwrap_or("".to_string());
+
     let output = Command::new("docker-compose")
         .current_dir(get_docker_compose_dirpath(scene_name))
-        .args(["up", service_id])
+        .args(args)
         .stderr(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|error| {
             format!(
-                "Could not start `docker-compose up {}` command: {}",
-                service_id, error
+                "Could not start `docker-compose up{}` command: {}",
+                service_id_format_string, error
             )
         })?
         .wait_with_output();
@@ -108,24 +117,34 @@ pub fn run_docker_compose_up(scene_name: &str, service_id: &str) -> Result<(), S
     match output.status.success() {
         true => Ok(()),
         false => Err(format!(
-            "Error running `docker-compose up {}` command: {}",
-            service_id,
+            "Error running `docker-compose up{}` command: {}",
+            service_id_format_string,
             String::from_utf8(output.stderr).unwrap()
         )),
     }
 }
 
-pub fn run_docker_compose_down(scene_name: &str, service_id: &str) -> Result<(), String> {
+pub fn run_docker_compose_down(scene_name: &str, service_id: Option<&str>) -> Result<(), String> {
+    let args: Vec<&str> = match service_id {
+        None => ["down"].to_vec(),
+        Some(x) => ["down", x].to_vec(),
+    };
+
+    let service_id_format_string = service_id
+        .map(|service_id| format!(" {service_id}"))
+        .unwrap_or("".to_string());
+    
     let output = Command::new("docker-compose")
         .current_dir(get_docker_compose_dirpath(scene_name))
-        .args(["down", service_id])
+        .args(args)
         .stderr(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|error| {
             format!(
                 "Could not start `docker-compose down {}` command: {}",
-                service_id, error
+                service_id_format_string,
+                error
             )
         })?
         .wait_with_output();
@@ -135,7 +154,7 @@ pub fn run_docker_compose_down(scene_name: &str, service_id: &str) -> Result<(),
         true => Ok(()),
         false => Err(format!(
             "Error running `docker-compose down {}` command: {}",
-            service_id,
+            service_id_format_string,
             String::from_utf8(output.stderr).unwrap()
         )),
     }
