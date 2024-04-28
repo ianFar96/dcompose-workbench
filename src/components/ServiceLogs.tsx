@@ -72,12 +72,13 @@ export default function ServiceLogs(props: ServiceLogsProps) {
     <div className='bg-black overflow-auto h-full w-full py-4'>
       {debouncedLogs.map((log, index) => (
         <span
-          className={`${log.type === 'stderr' ? 'text-red-600' : 'text-white'} whitespace-pre-wrap text-sm px-4 block`}
+          className={`${log.type === 'stderr' ? 'text-red-600' : 'text-white'} whitespace-pre-wrap text-sm px-4 block [overflow-anchor:none]`}
           key={index}
           title={log.timestamp}>
           {tryJsonDisplay(log.text)}
         </span>
       ))}
+      <div className='[overflow-anchor:auto] h-px'></div>
     </div>
   );
 }

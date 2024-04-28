@@ -175,7 +175,7 @@ export default function App() {
         <Button
           className='w-10 h-10 min-w-[unset] p-0'
           onClick={stopAll}
-          title='Start all services'
+          title='Stop all services'
           variant='outlined'
         >
           <Stop fontSize='large' />

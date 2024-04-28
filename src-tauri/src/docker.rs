@@ -4,7 +4,7 @@ use bollard::{
     Docker,
 };
 use chrono::DateTime;
-use futures::TryStreamExt;
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::{
@@ -133,7 +133,7 @@ pub fn run_docker_compose_down(scene_name: &str, service_id: Option<&str>) -> Re
     let service_id_format_string = service_id
         .map(|service_id| format!(" {service_id}"))
         .unwrap_or("".to_string());
-    
+
     let output = Command::new("docker-compose")
         .current_dir(get_docker_compose_dirpath(scene_name))
         .args(args)
@@ -143,8 +143,7 @@ pub fn run_docker_compose_down(scene_name: &str, service_id: Option<&str>) -> Re
         .map_err(|error| {
             format!(
                 "Could not start `docker-compose down {}` command: {}",
-                service_id_format_string,
-                error
+                service_id_format_string, error
             )
         })?
         .wait_with_output();
@@ -227,22 +226,21 @@ pub async fn start_emitting_service_logs(
             sleep(Duration::from_secs(1)).await;
         }
 
-        let logs_response = docker
-            .logs(
-                &thread_container_name,
-                Some(LogsOptions::<String> {
-                    stderr: true,
-                    stdout: true,
-                    timestamps: true,
-                    ..Default::default()
-                }),
-            )
-            .try_collect::<Vec<_>>()
-            .await;
+        let mut logs_stream = docker.logs::<String>(
+            &thread_container_name,
+            Some(LogsOptions::<String> {
+                follow: true,
+                tail: "all".to_string(),
+                stderr: true,
+                stdout: true,
+                timestamps: true,
+                ..Default::default()
+            }),
+        );
 
-        match logs_response {
-            Ok(logs) => {
-                for log in logs {
+        while let Some(log) = logs_stream.next().await {
+            match log {
+                Ok(log) => {
                     let log_string = log.to_string();
                     let (timestamp, text) = match log_string.split_once(' ') {
                         None => ("".to_string(), log_string),
@@ -286,19 +284,19 @@ pub async fn start_emitting_service_logs(
                         _ => {}
                     }
                 }
-            }
-            Err(error) => {
-                thread_app
-                    .emit_all(
-                        service_log_event_name.as_ref(),
-                        ServiceLogEventPayload {
-                            text: format!("Logs stream interrupted: {}", error),
-                            timestamp: get_formatted_date(None),
-                            clear: true,
-                            type_name: LogType::StdErr,
-                        },
-                    )
-                    .unwrap();
+                Err(error) => {
+                    thread_app
+                        .emit_all(
+                            service_log_event_name.as_ref(),
+                            ServiceLogEventPayload {
+                                text: format!("Logs stream interrupted: {}", error),
+                                timestamp: get_formatted_date(None),
+                                clear: true,
+                                type_name: LogType::StdErr,
+                            },
+                        )
+                        .unwrap();
+                }
             }
         }
     });
