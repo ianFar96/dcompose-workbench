@@ -7,6 +7,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NodeProps } from 'reactflow';
 import { Handle, Position } from 'reactflow';
 
+import type { ServiceStatus, StatusEventPayload } from '../types/service';
+
 import NodeDrawer from './NodeDrawer';
 
 export type CustomNodeData = {
@@ -14,12 +16,6 @@ export type CustomNodeData = {
   serviceId: string
   serviceName: string
   serviceType: string
-}
-
-type ServiceStatus = 'paused' | 'running' | 'loading' | 'error' | 'unknown'
-type StatusEventPayload = {
-  status: ServiceStatus
-  message?: string
 }
 
 export default function CustomNode(props: NodeProps<CustomNodeData>) {

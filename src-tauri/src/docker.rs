@@ -102,8 +102,8 @@ pub fn write_docker_compose_file(
 
 pub fn run_docker_compose_up(scene_name: &str, service_id: Option<&str>) -> Result<(), String> {
     let args: Vec<&str> = match service_id {
-        None => ["up"].to_vec(),
-        Some(x) => ["up", x].to_vec(),
+        None => ["up", "-d"].to_vec(),
+        Some(x) => ["up", "-d", x].to_vec(),
     };
 
     let service_id_format_string = service_id

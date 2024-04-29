@@ -1,0 +1,3 @@
+- Style edge drawer
+- Add delete edge in edge drawer
+- Make sure edge creation behaves as expected
