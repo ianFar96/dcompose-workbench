@@ -89,6 +89,17 @@ pub fn get_docker_compose_file(scene_name: &str) -> Result<DockerComposeFile, St
         .map_err(|err| format!("Cannot parse docker-compose.yml: {}", err))
 }
 
+pub fn write_docker_compose_file(
+    scene_name: &str,
+    docker_compose: &DockerComposeFile,
+) -> Result<(), String> {
+    let docker_compose_filepath = get_docker_compose_dirpath(scene_name).join("docker-compose.yml");
+
+    let docker_compose_stringified = serde_yaml::to_string(docker_compose).unwrap();
+    fs::write(&docker_compose_filepath, docker_compose_stringified)
+        .map_err(|err| format!("Cannot write file {:?}: {}", docker_compose_filepath, err))
+}
+
 pub fn run_docker_compose_up(scene_name: &str, service_id: Option<&str>) -> Result<(), String> {
     let args: Vec<&str> = match service_id {
         None => ["up"].to_vec(),
@@ -577,13 +588,7 @@ pub fn add_dependency(scene_name: &str, service_id: &str, depends_on: &str) -> R
         },
     );
 
-    let docker_compose_filepath = get_docker_compose_dirpath(scene_name).join("docker-compose.yml");
-
-    let docker_compose_stringified = serde_yaml::to_string(&docker_compose).unwrap();
-    fs::write(&docker_compose_filepath, docker_compose_stringified)
-        .map_err(|err| format!("Cannot write file {:?}: {}", docker_compose_filepath, err))?;
-
-    Ok(())
+    write_docker_compose_file(scene_name, &docker_compose)
 }
 
 pub fn remove_dependency(
@@ -605,16 +610,37 @@ pub fn remove_dependency(
         Some(x) => match x.remove(depends_on) {
             None => {}
             Some(_) => {
-                let docker_compose_filepath =
-                    get_docker_compose_dirpath(scene_name).join("docker-compose.yml");
-
-                let docker_compose_stringified = serde_yaml::to_string(&docker_compose).unwrap();
-                fs::write(&docker_compose_filepath, docker_compose_stringified).map_err(|err| {
-                    format!("Cannot write file {:?}: {}", docker_compose_filepath, err)
-                })?;
+                write_docker_compose_file(scene_name, &docker_compose)?;
             }
         },
     }
 
     Ok(())
+}
+
+pub fn set_depends_on_condition(
+    scene_name: &str,
+    service_id: &str,
+    depends_on: &str,
+    condition: &str,
+) -> Result<(), String> {
+    let mut docker_compose = get_docker_compose_file(scene_name)?;
+
+    let service = docker_compose
+        .services
+        .get_mut(service_id)
+        .ok_or(format!("Cannot find service {service_id} in storage"))?;
+
+    let dependencies_map = service.depends_on.as_mut().ok_or(format!(
+        "Cannot find dependency key in {service_id} in storage"
+    ))?;
+
+    dependencies_map
+        .get_mut(depends_on)
+        .ok_or(format!(
+            "Cannot find dependency {depends_on} in {service_id} in storage"
+        ))?
+        .condition = condition.to_string();
+
+    write_docker_compose_file(scene_name, &docker_compose)
 }

@@ -17,6 +17,7 @@ async fn main() {
             commands::stop_emitting_service_logs,
             commands::create_dependency,
             commands::delete_dependency,
+            commands::set_dependency_condition,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

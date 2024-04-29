@@ -1,3 +1,5 @@
+import type { DependsOnCondition } from './docker';
+
 export type Service = {
   id: string
   label: string
@@ -6,7 +8,7 @@ export type Service = {
 }
 
 export type ServiceDependency = {
-  condition: string
+  condition: DependsOnCondition
 }
 
 export type Scene = {

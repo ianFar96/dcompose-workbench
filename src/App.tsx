@@ -1,14 +1,17 @@
 import { PlayArrow, Stop } from '@mui/icons-material';
 import ReplayIcon from '@mui/icons-material/Replay';
-import { Button } from '@mui/material';
+import { Button, Drawer } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
 import dagre from 'dagre';
-import React, { useCallback, useEffect, useMemo } from 'react';
+import type { MouseEvent } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Connection, Edge, Node } from 'reactflow';
 import { Background, ControlButton, Controls, MiniMap, Position, default as ReactFlow, addEdge, useEdgesState, useNodesState } from 'reactflow';
 
 import type { CustomNodeData } from './components/CustomNode';
 import CustomNode from './components/CustomNode';
+import EdgeDrawer from './components/EdgeDrawer';
+import type { DependsOnCondition } from './types/docker';
 import type { Scene } from './types/scene';
 
 import '@fontsource/roboto/300.css';
@@ -16,6 +19,10 @@ import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
 import 'reactflow/dist/style.css';
+
+export type CustomEdgeData = {
+  condition: DependsOnCondition
+}
 
 const dagreGraph = new dagre.graphlib.Graph();
 dagreGraph.setDefaultEdgeLabel(() => ({}));
@@ -74,11 +81,14 @@ export default function App() {
         type: 'custom',
       }));
 
-      const sceneEdges: Edge[] = [];
+      const sceneEdges: Edge<CustomEdgeData>[] = [];
       for (const service of scene.services) {
-        for (const targetServiceId of Object.keys(service.dependsOn)) {
+        for (const [targetServiceId, definition] of Object.entries(service.dependsOn)) {
           sceneEdges.push({
             animated: true,
+            data: {
+              condition: definition.condition,
+            },
             id: `e${targetServiceId}-${service.id}`,
             source: targetServiceId,
             target: service.id,
@@ -117,6 +127,13 @@ export default function App() {
     }
   }, [setEdges]);
 
+  const [isEdgeDrawerOpen, setIsEdgeDrawerOpen] = useState(false);
+  const [selectedEdge, setSelectedEdge] = useState<Edge>();
+  const onEdgeClick = useCallback((_: MouseEvent<Element, globalThis.MouseEvent>, edge: Edge) => {
+    setIsEdgeDrawerOpen(true);
+    setSelectedEdge(edge);
+  }, []);
+
   const onLayout = useCallback(() => {
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges);
     setNodes([...layoutedNodes]);
@@ -141,28 +158,7 @@ export default function App() {
 
   return (
     <>
-      <div style={{ height: '100vh', width: '100vw' }}>
-        <ReactFlow
-          edges={edges}
-          fitView
-          nodeTypes={nodeTypes}
-          nodes={nodes}
-          onConnect={onConnect}
-          onEdgesChange={onEdgesChange}
-          onEdgesDelete={onEdgesDelete}
-          onNodesChange={onNodesChange}
-        >
-          <Background />
-          <MiniMap />
-          <Controls >
-            <ControlButton onClick={onLayout}>
-              <ReplayIcon />
-            </ControlButton>
-          </Controls>
-        </ReactFlow>
-      </div>
-
-      <div className='fixed top-4 right-4'>
+      <div className='fixed top-4 right-4 z-10'>
         <Button
           className='w-10 h-10 min-w-[unset] p-0 mr-2'
           onClick={startAll}
@@ -181,6 +177,36 @@ export default function App() {
           <Stop fontSize='large' />
         </Button>
       </div>
+
+      <div style={{ height: '100vh', width: '100vw' }}>
+        <ReactFlow
+          edges={edges}
+          fitView
+          nodeTypes={nodeTypes}
+          nodes={nodes}
+          onConnect={onConnect}
+          onEdgeClick={onEdgeClick}
+          onEdgesChange={onEdgesChange}
+          onEdgesDelete={onEdgesDelete}
+          onNodesChange={onNodesChange}
+        >
+          <Background />
+          <MiniMap />
+          <Controls >
+            <ControlButton onClick={onLayout}>
+              <ReplayIcon />
+            </ControlButton>
+          </Controls>
+        </ReactFlow>
+      </div>
+
+      <Drawer
+        anchor='right'
+        onClose={() => setIsEdgeDrawerOpen(false)}
+        open={isEdgeDrawerOpen}
+      >
+        {selectedEdge ? <EdgeDrawer edge={selectedEdge} sceneName={sceneName} /> : undefined}
+      </Drawer>
     </>
   );
 }
