@@ -1,4 +1,4 @@
-use std::{collections::HashMap, process::Command};
+use std::{collections::HashMap, fs, process::Command};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
@@ -6,6 +6,7 @@ use tauri::{AppHandle, State};
 use crate::{
     docker::{self, DockerComposeDependsOn},
     state::AppState,
+    utils::get_config_dirpath,
 };
 
 #[derive(Deserialize, Serialize)]
@@ -39,11 +40,29 @@ pub struct ServiceRelationship {
 
 #[derive(Deserialize, Serialize)]
 pub struct Scene {
-    pub services: Vec<Service>,
+    pub name: String,
 }
 
 #[tauri::command(async)]
-pub fn get_scene(app: AppHandle, scene_name: &str) -> Result<Scene, String> {
+pub fn get_scenes() -> Result<Vec<Scene>, String> {
+    let dir = fs::read_dir(get_config_dirpath().join("scenes"))
+        .map_err(|err| format!("Cannot read scenes list: {}", err))?;
+
+    let mut scenes = vec![];
+    for entry in dir {
+        let entry = entry.unwrap();
+        if entry.path().is_dir() {
+            scenes.push(Scene {
+                name: entry.file_name().to_string_lossy().to_string(),
+            })
+        }
+    }
+
+    Ok(scenes)
+}
+
+#[tauri::command(async)]
+pub fn get_scene_services(app: AppHandle, scene_name: &str) -> Result<Vec<Service>, String> {
     let docker_compose_file = docker::get_docker_compose_file(scene_name)?;
     let mut services: Vec<Service> = vec![];
     for (service_id, service) in docker_compose_file.services {
@@ -62,7 +81,7 @@ pub fn get_scene(app: AppHandle, scene_name: &str) -> Result<Scene, String> {
         docker::start_emitting_service_status(&app, scene_name, &service_id)?;
     }
 
-    Ok(Scene { services })
+    Ok(services)
 }
 
 #[tauri::command(async)]

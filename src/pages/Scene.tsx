@@ -1,17 +1,18 @@
-import { PlayArrow, Refresh, Stop } from '@mui/icons-material';
+import { ArrowBack, PlayArrow, Refresh, Stop } from '@mui/icons-material';
 import ReplayIcon from '@mui/icons-material/Replay';
 import { Button } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
 import dagre from 'dagre';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import type { Connection, Edge, Node } from 'reactflow';
 import { Background, ControlButton, Controls, MiniMap, Position, default as ReactFlow, addEdge, useEdgesState, useNodesState } from 'reactflow';
 
-import type { CustomEdgeData } from './components/CustomEdge';
-import CustomEdge from './components/CustomEdge';
-import type { CustomNodeData } from './components/CustomNode';
-import CustomNode from './components/CustomNode';
-import type { Scene } from './types/scene';
+import type { CustomEdgeData } from '../components/CustomEdge';
+import CustomEdge from '../components/CustomEdge';
+import type { CustomNodeData } from '../components/CustomNode';
+import CustomNode from '../components/CustomNode';
+import type { Service } from '../types/service';
 
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
@@ -55,18 +56,19 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
   return { edges, nodes };
 };
 
-export default function App() {
+export default function Scene() {
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
   const edgeTypes = useMemo(() => ({ custom: CustomEdge }), []);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
-  const sceneName = 'fast-data-example';
+  const { sceneName } = useParams();
+  if (!sceneName) { throw new Error(); }
 
   useEffect(() => {
-    invoke<Scene>('get_scene', { sceneName }).then(scene => {
-      const sceneNodes: Node<CustomNodeData>[] = scene.services.map(service => ({
+    invoke<Service[]>('get_scene_services', { sceneName }).then(services => {
+      const sceneNodes: Node<CustomNodeData>[] = services.map(service => ({
         data: {
           sceneName,
           serviceId: service.id,
@@ -79,7 +81,7 @@ export default function App() {
       }));
 
       const sceneEdges: Edge<CustomEdgeData>[] = [];
-      for (const service of scene.services) {
+      for (const service of services) {
         for (const [targetServiceId, definition] of Object.entries(service.dependsOn)) {
           sceneEdges.push({
             data: {
@@ -101,7 +103,7 @@ export default function App() {
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
     }).catch(console.error);
-  }, [setNodes, setEdges]);
+  }, [setNodes, setEdges, sceneName]);
 
   const onConnect = useCallback((connection: Connection) => {
     invoke('create_dependency', { sceneName, source: connection.source, target: connection.target })
@@ -120,7 +122,7 @@ export default function App() {
         // TODO: un bell'alert
         console.error(error);
       });
-  }, [setEdges]);
+  }, [sceneName, setEdges]);
 
   const onEdgesDelete = useCallback((edgesToDelete: Edge[]) => {
     for (const edge of edgesToDelete) {
@@ -133,7 +135,7 @@ export default function App() {
           console.error(error);
         });
     }
-  }, [setEdges]);
+  }, [sceneName, setEdges]);
 
   const onLayout = useCallback(() => {
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges);
@@ -152,7 +154,7 @@ export default function App() {
       .finally(() => {
         setIsRunningScene(false);
       });
-  }, []);
+  }, [sceneName]);
 
   const [isStoppingScene, setIsStoppingScene] = useState(false);
   const stopAll = useCallback(() => {
@@ -165,7 +167,7 @@ export default function App() {
       .finally(() => {
         setIsStoppingScene(false);
       });
-  }, []);
+  }, [sceneName]);
 
   const openVsCode = useCallback(() => {
     invoke('open_vscode', { sceneName })
@@ -173,17 +175,24 @@ export default function App() {
         // TODO: un bell'alert
         console.error(error);
       });
-  }, []);
+  }, [sceneName]);
 
   return (
     <>
+      <div className='fixed top-3 left-3 z-10 flex items-center'>
+        <a className='mr-2' href='/scenes'>
+          <ArrowBack />
+        </a>
+        <h2 className='text-xl'>{sceneName}</h2>
+      </div>
+
       <div className='fixed top-2 right-2 z-10'>
         <Button
           className='w-10 h-10 min-w-[unset] p-2 mr-2'
           onClick={openVsCode}
           title='Open in VS Code'
         >
-          <img alt='' src='src/assets/vscode.svg' />
+          <img alt='' src='/src/assets/vscode.svg' />
         </Button>
 
         <Button

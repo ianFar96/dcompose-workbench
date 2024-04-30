@@ -10,15 +10,18 @@ use serde_yaml::Value;
 use std::{
     collections::HashMap,
     fs,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command, Stdio},
     sync::Arc,
     time::Duration,
 };
-use tauri::{api::path::home_dir, AppHandle, Manager, State};
+use tauri::{AppHandle, Manager, State};
 use tokio::{spawn, time::sleep};
 
-use crate::{state::AppState, utils::get_formatted_date};
+use crate::{
+    state::AppState,
+    utils::{get_config_dirpath, get_formatted_date},
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DockerComposeLabels {
@@ -74,9 +77,7 @@ pub struct DockerComposeFile {
 }
 
 fn get_docker_compose_dirpath(scene_name: &str) -> PathBuf {
-    Path::new(&home_dir().unwrap())
-        .join(".dcompose-workbench/scenes")
-        .join(scene_name)
+    get_config_dirpath().join("scenes").join(scene_name)
 }
 
 pub fn get_docker_compose_file(scene_name: &str) -> Result<DockerComposeFile, String> {
