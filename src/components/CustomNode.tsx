@@ -1,12 +1,11 @@
 import { Error, Pause, PlayArrow, QuestionMark, Refresh } from '@mui/icons-material';
 import { Button, Card, CardContent, Chip, Drawer, Typography } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
-import type { UnlistenFn } from '@tauri-apps/api/event';
-import { listen } from '@tauri-apps/api/event';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NodeProps } from 'reactflow';
 import { Handle, Position } from 'reactflow';
 
+import useTauriEvent from '../hooks/useTauriEvent';
 import type { ServiceStatus, StatusEventPayload } from '../types/service';
 
 import NodeDrawer from './NodeDrawer';
@@ -22,21 +21,14 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
   const [status, setStatus] = useState<ServiceStatus>('unknown');
   const [statusText, setStatusText] = useState<string | undefined>();
 
+  const eventName = useMemo(() => `${props.data.sceneName}-${props.data.serviceId}-status-event`, [props.data.sceneName, props.data.serviceId]);
+  const payload = useTauriEvent<StatusEventPayload>(eventName);
   useEffect(() => {
-    const eventName = `${props.data.sceneName}-${props.data.serviceId}-status-event`;
-    const unlistenPromise = listen<StatusEventPayload>(eventName, event => {
-      setStatus(event.payload.status);
-      setStatusText(event.payload.message);
-    });
-
-    let unlisten: UnlistenFn | undefined;
-    unlistenPromise.then(unlistenFn => { unlisten = unlistenFn; })
-      .catch(error => {
-        // TODO: un bell'alert
-        console.error(error);
-      });
-    return () => { unlisten?.(); };
-  }, [props.data.sceneName, props.data.serviceId]);
+    if (payload) {
+      setStatus(payload.status);
+      setStatusText(payload.message);
+    }
+  }, [payload]);
 
   const run = useCallback(() => {
     setStatus('loading');

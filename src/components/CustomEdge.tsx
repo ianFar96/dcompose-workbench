@@ -1,11 +1,10 @@
 import { Drawer } from '@mui/material';
-import type { UnlistenFn } from '@tauri-apps/api/event';
-import { listen } from '@tauri-apps/api/event';
 import type { CSSProperties } from 'react';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { EdgeProps } from 'reactflow';
 import { BaseEdge, Position, getBezierPath, useReactFlow } from 'reactflow';
 
+import useTauriEvent from '../hooks/useTauriEvent';
 import type { DependsOnCondition } from '../types/docker';
 import type { ServiceStatus, StatusEventPayload } from '../types/service';
 
@@ -32,36 +31,23 @@ export default function CustomEdge(props: EdgeProps<CustomEdgeData>) {
   const { setEdges } = useReactFlow<CustomNodeData, CustomEdgeData>();
 
   const [sourceStatus, setSourceStatus] = useState<ServiceStatus>('unknown');
-  useEffect(() => {
-    const eventName = `${props.data?.sceneName}-${props.data?.sourceServiceId}-status-event`;
-    const unlistenPromise = listen<StatusEventPayload>(eventName, event => {
-      setSourceStatus(event.payload.status);
-    });
-
-    let unlisten: UnlistenFn | undefined;
-    unlistenPromise.then(unlistenFn => { unlisten = unlistenFn; })
-      .catch(error => {
-        // TODO: un bell'alert
-        console.error(error);
-      });
-    return () => { unlisten?.(); };
-  }, [props.data?.sceneName, props.data?.sourceServiceId]);
-
   const [targetStatus, setTargetStatus] = useState<ServiceStatus>('unknown');
-  useEffect(() => {
-    const eventName = `${props.data?.sceneName}-${props.data?.targetServiceId}-status-event`;
-    const unlistenPromise = listen<StatusEventPayload>(eventName, event => {
-      setTargetStatus(event.payload.status);
-    });
 
-    let unlisten: UnlistenFn | undefined;
-    unlistenPromise.then(unlistenFn => { unlisten = unlistenFn; })
-      .catch(error => {
-        // TODO: un bell'alert
-        console.error(error);
-      });
-    return () => { unlisten?.(); };
-  }, [props.data?.sceneName, props.data?.targetServiceId]);
+  const sourceEventName = useMemo(() => `${props.data?.sceneName}-${props.data?.sourceServiceId}-status-event`, [props.data?.sceneName, props.data?.sourceServiceId]);
+  const sourceStatusPayload = useTauriEvent<StatusEventPayload>(sourceEventName);
+  useEffect(() => {
+    if (sourceStatusPayload) {
+      setSourceStatus(sourceStatusPayload.status);
+    }
+  }, [sourceStatusPayload]);
+
+  const targetEventName = useMemo(() => `${props.data?.sceneName}-${props.data?.targetServiceId}-status-event`, [props.data?.sceneName, props.data?.targetServiceId]);
+  const targetStatusPayload = useTauriEvent<StatusEventPayload>(targetEventName);
+  useEffect(() => {
+    if (targetStatusPayload) {
+      setTargetStatus(targetStatusPayload.status);
+    }
+  }, [targetStatusPayload]);
 
   const [edgeStyle, setEdgeStyle] = useState<CSSProperties>({});
   useEffect(() => {

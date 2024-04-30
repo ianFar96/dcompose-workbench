@@ -1,8 +1,8 @@
 import { useDebouncedState } from '@mantine/hooks';
 import { invoke } from '@tauri-apps/api';
-import type { UnlistenFn } from '@tauri-apps/api/event';
-import { listen } from '@tauri-apps/api/event';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+
+import useTauriEvent from '../hooks/useTauriEvent';
 
 type ServiceLogsProps = {
   serviceId: string
@@ -26,35 +26,30 @@ export default function ServiceLogs(props: ServiceLogsProps) {
   const [logs, setLogs] = useState<Log[]>([]);
   const [debouncedLogs, setDeboucesLogs] = useDebouncedState<Log[]>([], 500);
 
+  const eventName = useMemo(() => `${props.sceneName}-${props.serviceId}-log-event`, [props.sceneName, props.serviceId]);
+  const payload = useTauriEvent<LogEventPayload>(eventName);
   useEffect(() => {
-    const eventName = `${props.sceneName}-${props.serviceId}-log-event`;
-    const unlistenPromise = listen<LogEventPayload>(eventName, event => {
+    if (payload) {
       setLogs(logs => [
-        ...(!event.payload.clear ? logs : []),
-        event.payload,
+        ...(!payload.clear ? logs : []),
+        payload,
       ]);
-    });
+    }
+  }, [payload]);
 
+  useEffect(() => {
     invoke('start_emitting_service_logs', { sceneName: props.sceneName, serviceId: props.serviceId }).catch(error => {
       // TODO: un bell'alert
       console.error(error);
     });
 
-    let unlisten: UnlistenFn | undefined;
-    unlistenPromise.then(unlistenFn => { unlisten = unlistenFn; })
-      .catch(error => {
-        // TODO: un bell'alert
-        console.error(error);
-      });
     return () => {
       invoke('stop_emitting_service_logs', { sceneName: props.sceneName, serviceId: props.serviceId }).catch(error => {
         // TODO: un bell'alert
         console.error(error);
       });
-
-      unlisten?.();
     };
-  }, [props.sceneName, props.serviceId, setLogs]);
+  }, [props.sceneName, props.serviceId]);
 
   useEffect(() => {
     setDeboucesLogs(logs);
