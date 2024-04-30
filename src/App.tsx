@@ -167,9 +167,25 @@ export default function App() {
       });
   }, []);
 
+  const openVsCode = useCallback(() => {
+    invoke('open_vscode', { sceneName })
+      .catch(error => {
+        // TODO: un bell'alert
+        console.error(error);
+      });
+  }, []);
+
   return (
     <>
-      <div className='fixed top-4 right-4 z-10'>
+      <div className='fixed top-2 right-2 z-10'>
+        <Button
+          className='w-10 h-10 min-w-[unset] p-2 mr-2'
+          onClick={openVsCode}
+          title='Open in VS Code'
+        >
+          <img alt='' src='src/assets/vscode.svg' />
+        </Button>
+
         <Button
           className='w-10 h-10 min-w-[unset] p-0 mr-2'
           disabled={isRunningScene}

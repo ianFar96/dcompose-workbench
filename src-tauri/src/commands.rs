@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, process::Command};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
@@ -55,12 +55,7 @@ pub fn get_scene(app: AppHandle, scene_name: &str) -> Result<Scene, String> {
                 .depends_on
                 .unwrap_or(HashMap::new())
                 .into_iter()
-                .map(|depends_on| {
-                    (
-                        depends_on.0,
-                        depends_on.1.into(),
-                    )
-                })
+                .map(|depends_on| (depends_on.0, depends_on.1.into()))
                 .collect(),
         });
 
@@ -119,6 +114,20 @@ pub fn delete_dependency(scene_name: &str, source: &str, target: &str) -> Result
 }
 
 #[tauri::command(async)]
-pub fn set_dependency_condition(scene_name: &str, source: &str, target: &str, condition: &str) -> Result<(), String> {
+pub fn set_dependency_condition(
+    scene_name: &str,
+    source: &str,
+    target: &str,
+    condition: &str,
+) -> Result<(), String> {
     docker::set_depends_on_condition(scene_name, target, source, condition)
+}
+
+#[tauri::command(async)]
+pub fn open_vscode(scene_name: &str) -> Result<(), String> {
+    Command::new("code")
+        .arg(format!("/home/mia/.dcompose-workbench/scenes/{scene_name}"))
+        .spawn().map_err(|err| format!("Unable to open vs-code in /home/mia/.dcompose-workbench/scenes/{scene_name}: {err}"))?;
+
+    Ok(())
 }
