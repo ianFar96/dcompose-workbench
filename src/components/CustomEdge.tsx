@@ -34,20 +34,14 @@ export default function CustomEdge(props: EdgeProps<CustomEdgeData>) {
   const [targetStatus, setTargetStatus] = useState<ServiceStatus>('unknown');
 
   const sourceEventName = useMemo(() => `${props.data?.sceneName}-${props.data?.sourceServiceId}-status-event`, [props.data?.sceneName, props.data?.sourceServiceId]);
-  const sourceStatusPayload = useTauriEvent<StatusEventPayload>(sourceEventName);
-  useEffect(() => {
-    if (sourceStatusPayload) {
-      setSourceStatus(sourceStatusPayload.status);
-    }
-  }, [sourceStatusPayload]);
+  useTauriEvent<StatusEventPayload>(sourceEventName, payload => {
+    setSourceStatus(payload.status);
+  });
 
   const targetEventName = useMemo(() => `${props.data?.sceneName}-${props.data?.targetServiceId}-status-event`, [props.data?.sceneName, props.data?.targetServiceId]);
-  const targetStatusPayload = useTauriEvent<StatusEventPayload>(targetEventName);
-  useEffect(() => {
-    if (targetStatusPayload) {
-      setTargetStatus(targetStatusPayload.status);
-    }
-  }, [targetStatusPayload]);
+  useTauriEvent<StatusEventPayload>(targetEventName, payload => {
+    setTargetStatus(payload.status);
+  });
 
   const [edgeStyle, setEdgeStyle] = useState<CSSProperties>({});
   useEffect(() => {

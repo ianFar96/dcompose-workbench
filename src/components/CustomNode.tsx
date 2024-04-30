@@ -1,7 +1,7 @@
 import { Error, Pause, PlayArrow, QuestionMark, Refresh } from '@mui/icons-material';
 import { Button, Card, CardContent, Chip, Drawer, Typography } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import type { NodeProps } from 'reactflow';
 import { Handle, Position } from 'reactflow';
 
@@ -22,13 +22,10 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
   const [statusText, setStatusText] = useState<string | undefined>();
 
   const eventName = useMemo(() => `${props.data.sceneName}-${props.data.serviceId}-status-event`, [props.data.sceneName, props.data.serviceId]);
-  const payload = useTauriEvent<StatusEventPayload>(eventName);
-  useEffect(() => {
-    if (payload) {
-      setStatus(payload.status);
-      setStatusText(payload.message);
-    }
-  }, [payload]);
+  useTauriEvent<StatusEventPayload>(eventName, payload => {
+    setStatus(payload.status);
+    setStatusText(payload.message);
+  });
 
   const run = useCallback(() => {
     setStatus('loading');

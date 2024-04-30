@@ -27,15 +27,12 @@ export default function ServiceLogs(props: ServiceLogsProps) {
   const [debouncedLogs, setDeboucesLogs] = useDebouncedState<Log[]>([], 500);
 
   const eventName = useMemo(() => `${props.sceneName}-${props.serviceId}-log-event`, [props.sceneName, props.serviceId]);
-  const payload = useTauriEvent<LogEventPayload>(eventName);
-  useEffect(() => {
-    if (payload) {
-      setLogs(logs => [
-        ...(!payload.clear ? logs : []),
-        payload,
-      ]);
-    }
-  }, [payload]);
+  useTauriEvent<LogEventPayload>(eventName, payload => {
+    setLogs(logs => [
+      ...(!payload.clear ? logs : []),
+      payload,
+    ]);
+  });
 
   useEffect(() => {
     invoke('start_emitting_service_logs', { sceneName: props.sceneName, serviceId: props.serviceId }).catch(error => {

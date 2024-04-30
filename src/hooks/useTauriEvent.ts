@@ -1,12 +1,10 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
-export default function useTauriEvent<T>(eventName: string) {
-  const [payload, setPayload] = useState<T | undefined>();
-
+export default function useTauriEvent<T>(eventName: string, callback: (payload: T) => void) {
   useEffect(() => {
     const unlistenPromise = listen<T>(eventName, event => {
-      setPayload(event.payload);
+      callback(event.payload);
     });
 
     let unlisten: UnlistenFn | undefined;
@@ -17,6 +15,4 @@ export default function useTauriEvent<T>(eventName: string) {
       });
     return () => { unlisten?.(); };
   }, []);
-
-  return payload;
 }
