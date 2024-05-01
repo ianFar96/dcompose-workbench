@@ -18,7 +18,7 @@ use tauri::{AppHandle, Manager, State};
 use tokio::{spawn, time::sleep};
 
 use crate::{
-    state::{AppState, ServiceLogKey},
+    state::{AppState, ServiceKey},
     utils::{get_config_dirpath, get_formatted_date},
 };
 
@@ -361,7 +361,7 @@ pub async fn start_emitting_service_logs(
 
     let state = app.state::<AppState>();
     state.service_log_handles.lock().await.insert(
-        ServiceLogKey {
+        ServiceKey {
             scene_name: scene_name.to_string(),
             service_id: service_id.to_string(),
         },
@@ -377,7 +377,7 @@ pub async fn stop_emitting_service_logs(
     service_id: &str,
 ) -> Result<(), String> {
     let service_log_handles = state.service_log_handles.lock().await;
-    let log_handle = service_log_handles.get(&ServiceLogKey {
+    let log_handle = service_log_handles.get(&ServiceKey {
         scene_name: scene_name.to_string(),
         service_id: service_id.to_string(),
     });
@@ -412,7 +412,7 @@ struct ServiceStatusEventPayload {
     message: Option<String>,
 }
 
-pub fn start_emitting_service_status(
+pub async fn start_emitting_service_status(
     app: &AppHandle,
     scene_name: &str,
     service_id: &str,
@@ -424,8 +424,7 @@ pub fn start_emitting_service_status(
     let thread_scene_name = scene_name.to_string();
     let thread_service_id = service_id.to_string();
 
-    // FIXME: put handle in state
-    let _status_handle = spawn(async move {
+    let status_handle = spawn(async move {
         let service_status_event_name =
             &format!("{thread_scene_name}-{thread_service_id}-status-event");
 
@@ -456,7 +455,9 @@ pub fn start_emitting_service_status(
                                         service_status_event_name,
                                         ServiceStatusEventPayload {
                                             status: ServiceStatus::Paused,
-                                            message: Some("Status: unexisting container".to_string()),
+                                            message: Some(
+                                                "Status: unexisting container".to_string(),
+                                            ),
                                         },
                                     )
                                     .unwrap();
@@ -546,6 +547,15 @@ pub fn start_emitting_service_status(
         }
     });
 
+    let state = app.state::<AppState>();
+    state.service_status_handles.lock().await.insert(
+        ServiceKey {
+            scene_name: scene_name.to_string(),
+            service_id: service_id.to_string(),
+        },
+        status_handle,
+    );
+
     Ok(())
 }
 
@@ -615,6 +625,29 @@ fn get_service_status_from_health_status(health_status: HealthStatusEnum) -> Opt
         HealthStatusEnum::UNHEALTHY => Some(ServiceStatus::Error),
         HealthStatusEnum::STARTING => Some(ServiceStatus::Loading),
         HealthStatusEnum::EMPTY | HealthStatusEnum::NONE => None,
+    }
+}
+
+pub async fn stop_emitting_service_status(
+    state: State<'_, AppState>,
+    scene_name: &str,
+    service_id: &str,
+) -> Result<(), String> {
+    let service_status_handles = state.service_status_handles.lock().await;
+    let status_handle = service_status_handles.get(&ServiceKey {
+        scene_name: scene_name.to_string(),
+        service_id: service_id.to_string(),
+    });
+
+    match status_handle {
+        Some(status_handle) => {
+            status_handle.abort();
+            Ok(())
+        }
+        None => Err(format!(
+            "Could not find the status emitting process for scene {} and service {}",
+            scene_name, service_id
+        )),
     }
 }
 

@@ -1,5 +1,5 @@
 import { ArrowBack, Search } from '@mui/icons-material';
-import { Box, Button, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
+import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
 import React, { useMemo, useState } from 'react';
 
 import ServiceLogs from './ServiceLogs';
@@ -20,15 +20,12 @@ export default function NodeDrawer(props: NodeDrawerProps) {
       return (
         <Box className='max-w-[75vw] min-w-72 h-screen flex flex-col' role='presentation'>
           <div className='flex items-center px-6 py-4'>
-            <Button
-              className='w-6 h-6 min-w-[unset] p-0 outline-none border-none mr-2'
-              color='inherit'
+            <button
+              className='mr-2 -ml-2'
               onClick={() => setPage(undefined)}
-              title='Go back'
-              variant='outlined'
             >
               <ArrowBack fontSize='small' />
-            </Button>
+            </button>
             <h2 className='text-lg whitespace-nowrap'>{props.serviceId}</h2>
           </div>
           <hr />

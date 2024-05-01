@@ -62,7 +62,7 @@ pub fn get_scenes() -> Result<Vec<Scene>, String> {
 }
 
 #[tauri::command(async)]
-pub fn get_scene_services(app: AppHandle, scene_name: &str) -> Result<Vec<Service>, String> {
+pub async fn get_scene_services(scene_name: &str) -> Result<Vec<Service>, String> {
     let docker_compose_file = docker::get_docker_compose_file(scene_name)?;
     let mut services: Vec<Service> = vec![];
     for (service_id, service) in docker_compose_file.services {
@@ -83,11 +83,27 @@ pub fn get_scene_services(app: AppHandle, scene_name: &str) -> Result<Vec<Servic
                 .map(|depends_on| (depends_on.0, depends_on.1.into()))
                 .collect(),
         });
-
-        docker::start_emitting_service_status(&app, scene_name, &service_id)?;
     }
 
     Ok(services)
+}
+
+#[tauri::command(async)]
+pub async fn start_emitting_service_status(
+    app: AppHandle,
+    scene_name: &str,
+    service_id: &str,
+) -> Result<(), String> {
+    docker::start_emitting_service_status(&app, scene_name, service_id).await
+}
+
+#[tauri::command(async)]
+pub async fn stop_emitting_service_status(
+    state: State<'_, AppState>,
+    scene_name: &str,
+    service_id: &str,
+) -> Result<(), String> {
+    docker::stop_emitting_service_status(state, scene_name, service_id).await
 }
 
 #[tauri::command(async)]

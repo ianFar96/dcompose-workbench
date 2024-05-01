@@ -4,7 +4,7 @@ import { Button } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
 import dagre from 'dagre';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import type { Connection, Edge, Node } from 'reactflow';
 import { Background, ControlButton, Controls, MiniMap, Position, default as ReactFlow, addEdge, useEdgesState, useNodesState } from 'reactflow';
 
@@ -57,6 +57,8 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
 };
 
 export default function Scene() {
+  const navigate = useNavigate();
+
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
   const edgeTypes = useMemo(() => ({ custom: CustomEdge }), []);
 
@@ -67,7 +69,16 @@ export default function Scene() {
   if (!sceneName) { throw new Error(); }
 
   useEffect(() => {
+    const unlistenStatusFns: (() => Promise<unknown>)[] = [];
     invoke<Service[]>('get_scene_services', { sceneName }).then(services => {
+      for (const service of services) {
+        invoke('start_emitting_service_status', { sceneName, serviceId: service.id }).catch(error => {
+          // TODO: un bell'alert
+          console.error(error);
+        });
+        unlistenStatusFns.push(invoke.bind(undefined, 'stop_emitting_service_status', { sceneName, serviceId: service.id }));
+      }
+
       const sceneNodes: Node<CustomNodeData>[] = services.map(service => ({
         data: {
           sceneName,
@@ -103,6 +114,15 @@ export default function Scene() {
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
     }).catch(console.error);
+
+    return () => {
+      for (const unlisten of unlistenStatusFns) {
+        unlisten().catch(error => {
+          // TODO: un bell'alert
+          console.error(error);
+        });
+      }
+    };
   }, [setNodes, setEdges, sceneName]);
 
   const onConnect = useCallback((connection: Connection) => {
@@ -182,9 +202,9 @@ export default function Scene() {
       <div className='flex flex-col h-screen'>
         <div className='flex justify-between px-4 py-3 shadow-lg z-10'>
           <div className='flex items-center'>
-            <a className='mr-2' href='/scenes'>
+            <button className='mr-2 p-0' onClick={() => navigate('/scenes')}>
               <ArrowBack />
-            </a>
+            </button>
             <h2 className='text-xl'>{sceneName}</h2>
           </div>
 
