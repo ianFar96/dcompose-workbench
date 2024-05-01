@@ -61,7 +61,7 @@ export default function ServiceLogs(props: ServiceLogsProps) {
   }, []);
 
   return (
-    <div className='bg-black overflow-auto h-full w-full py-4'>
+    <div className='bg-[#1e1e1e] overflow-auto h-full w-full py-4'>
       {debouncedLogs.map((log, index) => (
         <span
           className={`${log.type === 'stderr' ? 'text-red-600' : 'text-white'} whitespace-pre-wrap text-sm px-4 block [overflow-anchor:none]`}

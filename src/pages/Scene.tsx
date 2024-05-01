@@ -247,7 +247,7 @@ export default function Scene() {
               onClick={openVsCode}
               title='Open in VS Code'
             >
-              <img alt='' src='/src/assets/vscode.svg' />
+              <img alt='' src='/vscode.svg' />
             </Button>
 
             <Button

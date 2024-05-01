@@ -6,7 +6,7 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "dcompose-workbench",
+    "productName": "DCompose Workbench",
     "version": "0.0.0"
   },
   "tauri": {
@@ -15,7 +15,7 @@
     },
     "windows": [
       {
-        "title": "dcompose-workbench",
+        "title": "DCompose Workbench",
         "width": 800,
         "height": 600
       }
@@ -26,7 +26,7 @@
     "bundle": {
       "active": true,
       "targets": "all",
-      "identifier": "com.tauri.dev",
+      "identifier": "it.dcompose-workbench.dev",
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",

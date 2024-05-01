@@ -1,0 +1,3 @@
+- Create new service
+- Create/delete/update new scene
+- Upload files to the service folder to be used as volumes
