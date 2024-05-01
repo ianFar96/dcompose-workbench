@@ -13,6 +13,8 @@ export type Service = {
   dependsOn: Record<string, ServiceDependency>
 }
 
+export type ServiceYaml = Record<string, unknown>
+
 export type ServiceDependency = {
   condition: DependsOnCondition
 }

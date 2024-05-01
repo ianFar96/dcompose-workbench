@@ -68,8 +68,8 @@ export default function Scene() {
   const { sceneName } = useParams();
   if (!sceneName) { throw new Error(); }
 
-  useEffect(() => {
-    const unlistenStatusFns: (() => Promise<unknown>)[] = [];
+  const unlistenStatusFns: (() => Promise<unknown>)[] = useMemo(() => [], []);
+  const loadScene = useCallback(() => {
     invoke<Service[]>('get_scene_services', { sceneName }).then(services => {
       for (const service of services) {
         invoke('start_emitting_service_status', { sceneName, serviceId: service.id }).catch(error => {
@@ -114,6 +114,10 @@ export default function Scene() {
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
     }).catch(console.error);
+  }, [sceneName, setEdges, setNodes, unlistenStatusFns]);
+
+  useEffect(() => {
+    loadScene();
 
     return () => {
       for (const unlisten of unlistenStatusFns) {
@@ -123,7 +127,7 @@ export default function Scene() {
         });
       }
     };
-  }, [setNodes, setEdges, sceneName]);
+  }, [setNodes, setEdges, sceneName, loadScene, unlistenStatusFns]);
 
   const onConnect = useCallback((connection: Connection) => {
     invoke('create_dependency', { sceneName, source: connection.source, target: connection.target })
@@ -197,6 +201,27 @@ export default function Scene() {
       });
   }, [sceneName]);
 
+  const reloadScene = useCallback(() => {
+    for (const unlisten of unlistenStatusFns) {
+      unlisten().catch(error => {
+        // TODO: un bell'alert
+        console.error(error);
+      });
+    }
+
+    loadScene();
+  }, [loadScene, unlistenStatusFns]);
+
+  useEffect(() => {
+    const callback = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.key === 'r') {
+        reloadScene();
+      }
+    };
+    window.addEventListener('keydown', callback);
+    return () => { window.removeEventListener('keydown', callback); };
+  }, [reloadScene]);
+
   return (
     <>
       <div className='flex flex-col h-screen'>
@@ -209,6 +234,14 @@ export default function Scene() {
           </div>
 
           <div>
+            <Button
+              className='w-10 h-10 min-w-[unset] p-2 mr-2'
+              onClick={reloadScene}
+              title='Reload scene config'
+            >
+              <Refresh className='text-gray-500' fontSize='large' />
+            </Button>
+
             <Button
               className='w-10 h-10 min-w-[unset] p-2 mr-2'
               onClick={openVsCode}

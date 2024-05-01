@@ -10,6 +10,8 @@ async fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::get_scenes,
             commands::get_scene_services,
+            commands::get_service,
+            commands::overwrite_service_config,
             commands::start_emitting_service_status,
             commands::stop_emitting_service_status,
             commands::run_scene,

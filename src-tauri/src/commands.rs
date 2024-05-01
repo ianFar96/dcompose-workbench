@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
 use crate::{
-    docker::{self, DockerComposeDependsOn},
+    docker::{self, DockerComposeDependsOn, DockerComposeService},
     state::AppState,
     utils::get_config_dirpath,
 };
@@ -86,6 +86,32 @@ pub async fn get_scene_services(scene_name: &str) -> Result<Vec<Service>, String
     }
 
     Ok(services)
+}
+
+#[tauri::command(async)]
+pub fn get_service(scene_name: &str, service_id: &str) -> Result<DockerComposeService, String> {
+    let docker_compose_file = docker::get_docker_compose_file(scene_name)?;
+    let docker_service = docker_compose_file.services.get(service_id).ok_or(format!(
+        "Cannot find service {service_id} in docker compose file"
+    ))?;
+    Ok(docker_service.clone())
+}
+
+#[tauri::command(async)]
+pub fn overwrite_service_config(
+    scene_name: &str,
+    service_id: &str,
+    config: DockerComposeService,
+) -> Result<(), String> {
+    let mut docker_compose_file = docker::get_docker_compose_file(scene_name)?;
+    let result = docker_compose_file
+        .services
+        .insert(service_id.to_string(), config);
+
+    match result {
+        None => Err(format!("Cannot find service {service_id}")),
+        Some(_) => docker::write_docker_compose_file(scene_name, &docker_compose_file),
+    }
 }
 
 #[tauri::command(async)]

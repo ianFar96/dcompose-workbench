@@ -22,7 +22,7 @@ use crate::{
     utils::{get_config_dirpath, get_formatted_date},
 };
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DockerComposeLabels {
     #[serde(rename = "serviceName", skip_serializing_if = "Option::is_none")]
     pub service_name: Option<String>,
@@ -33,7 +33,7 @@ pub struct DockerComposeLabels {
     extra: HashMap<String, Value>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct DockerComposeDependsOn {
     pub condition: String,
 
@@ -50,7 +50,7 @@ impl Default for DockerComposeDependsOn {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DockerComposeService {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub labels: Option<DockerComposeLabels>,

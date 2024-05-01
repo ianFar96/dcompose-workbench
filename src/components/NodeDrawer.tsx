@@ -1,7 +1,8 @@
-import { ArrowBack, Search } from '@mui/icons-material';
+import { ArrowBack, Edit, Search } from '@mui/icons-material';
 import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
 import React, { useMemo, useState } from 'react';
 
+import EditService from './EditService';
 import ServiceLogs from './ServiceLogs';
 
 type Pages = undefined | 'logs' | 'edit'
@@ -34,6 +35,27 @@ export default function NodeDrawer(props: NodeDrawerProps) {
         </Box>
       );
 
+    case 'edit':
+      return (
+        <Box className='max-w-[75vw] min-w-[500px] h-screen flex flex-col' role='presentation'>
+          <div className='flex justify-between items-center px-6 py-4'>
+            <div className='flex items-center'>
+              <button
+                className='mr-2 -ml-2'
+                onClick={() => setPage(undefined)}
+              >
+                <ArrowBack fontSize='small' />
+              </button>
+              <h2 className='text-lg whitespace-nowrap'>{props.serviceId}</h2>
+            </div>
+            <span className='text-sm text-gray-500'><b>ctrl+s</b> to save</span>
+          </div>
+          <hr />
+
+          <EditService sceneName={props.sceneName} serviceId={props.serviceId}/>
+        </Box>
+      );
+
     case undefined:
     default:
       return (
@@ -52,14 +74,14 @@ export default function NodeDrawer(props: NodeDrawerProps) {
                 <ListItemText primary='Logs' />
               </ListItemButton>
             </ListItem>
-            {/* <ListItem disablePadding>
+            <ListItem disablePadding>
               <ListItemButton onClick={() => setPage('edit')}>
                 <ListItemIcon>
                   <Edit />
                 </ListItemIcon>
                 <ListItemText primary='Edit' />
               </ListItemButton>
-            </ListItem> */}
+            </ListItem>
           </List>
         </Box>
       );
