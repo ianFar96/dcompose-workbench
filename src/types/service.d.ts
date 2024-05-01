@@ -9,7 +9,7 @@ export type StatusEventPayload = {
 export type Service = {
   id: string
   label: string
-  type: string
+  type?: string
   dependsOn: Record<string, ServiceDependency>
 }
 

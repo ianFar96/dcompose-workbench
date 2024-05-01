@@ -14,7 +14,7 @@ export type CustomNodeData = {
   sceneName: string
   serviceId: string
   serviceName: string
-  serviceType: string
+  serviceType?: string
 }
 
 export default function CustomNode(props: NodeProps<CustomNodeData>) {
@@ -123,7 +123,7 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
           <Typography component='span' title={props.data.serviceName} variant='h5'>
             {props.data.serviceName}
           </Typography>
-          <Chip className='absolute bottom-2 left-3' color='primary' label={props.data.serviceType} size='small' variant='outlined' />
+          {props.data.serviceType ? <Chip className='absolute bottom-2 left-3' color='primary' label={props.data.serviceType} size='small' variant='outlined' /> : undefined}
         </CardContent>
       </Card>
 

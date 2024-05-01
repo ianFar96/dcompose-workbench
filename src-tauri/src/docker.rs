@@ -1,5 +1,5 @@
 use bollard::{
-    container::{InspectContainerOptions, ListContainersOptions, LogOutput, LogsOptions},
+    container::{InspectContainerOptions, LogOutput, LogsOptions},
     secret::{ContainerState, ContainerStateStatusEnum, HealthStatusEnum},
     Docker,
 };
@@ -12,23 +12,22 @@ use std::{
     fs,
     path::PathBuf,
     process::{Command, Stdio},
-    sync::Arc,
     time::Duration,
 };
 use tauri::{AppHandle, Manager, State};
 use tokio::{spawn, time::sleep};
 
 use crate::{
-    state::AppState,
+    state::{AppState, ServiceLogKey},
     utils::{get_config_dirpath, get_formatted_date},
 };
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DockerComposeLabels {
-    #[serde(rename = "serviceName")]
-    pub service_name: String,
-    #[serde(rename = "serviceType")]
-    pub service_type: String,
+    #[serde(rename = "serviceName", skip_serializing_if = "Option::is_none")]
+    pub service_name: Option<String>,
+    #[serde(rename = "serviceType", skip_serializing_if = "Option::is_none")]
+    pub service_type: Option<String>,
 
     #[serde(flatten)]
     extra: HashMap<String, Value>,
@@ -53,7 +52,8 @@ impl Default for DockerComposeDependsOn {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DockerComposeService {
-    pub labels: DockerComposeLabels,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub labels: Option<DockerComposeLabels>,
     #[serde(skip_serializing_if = "is_none_or_empty")]
     pub depends_on: Option<HashMap<String, DockerComposeDependsOn>>,
 
@@ -102,10 +102,10 @@ pub fn write_docker_compose_file(
 }
 
 pub fn run_docker_compose_up(scene_name: &str, service_id: Option<&str>) -> Result<(), String> {
-    let args: Vec<&str> = match service_id {
-        None => ["up", "-d"].to_vec(),
-        Some(x) => ["up", "-d", x].to_vec(),
-    };
+    let mut args = vec!["--project-name", scene_name, "up", "-d"];
+    if let Some(service_id) = service_id {
+        args.push(service_id);
+    }
 
     let service_id_format_string = service_id
         .map(|service_id| format!(" {service_id}"))
@@ -171,6 +171,47 @@ pub fn run_docker_compose_down(scene_name: &str, service_id: Option<&str>) -> Re
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct DockerComposePsResponse {
+    #[serde(rename = "Service")]
+    service: String,
+    #[serde(rename = "Name")]
+    name: String,
+}
+
+fn get_container_names_from_services(scene_name: &str) -> Result<HashMap<String, String>, String> {
+    let output = Command::new("docker-compose")
+        .current_dir(get_docker_compose_dirpath(scene_name))
+        .args(["ps", "--format", "json"])
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("Could not retrieve docker compose list: {}", error))?
+        .wait_with_output()
+        .unwrap();
+
+    match output.status.code().unwrap() {
+        0 => {
+            let output_string = String::from_utf8(output.stdout).unwrap();
+            let mut output_jsonlike_string = output_string.replace('\n', ",");
+            output_jsonlike_string.pop();
+            output_jsonlike_string = format!("[{}]", output_jsonlike_string);
+
+            let output_json: Vec<DockerComposePsResponse> =
+                serde_json::from_str(&output_jsonlike_string).unwrap();
+
+            Ok(output_json
+                .iter()
+                .map(|container| (container.service.clone(), container.name.clone()))
+                .collect::<HashMap<_, _>>())
+        }
+        x => Err(format!(
+            "Docker compose list command exited with code {x}: {}",
+            String::from_utf8(output.stderr).unwrap()
+        )),
+    }
+}
+
 #[derive(Serialize, Clone)]
 enum LogType {
     #[serde(rename = "stderr")]
@@ -196,23 +237,20 @@ pub async fn start_emitting_service_logs(
     let docker = Docker::connect_with_socket_defaults()
         .map_err(|error| format!("Cannot connect to docker socket: {}", error))?;
 
-    let container_name = format!("{}-{}", scene_name, service_id);
-    let arc_container_name = Arc::new(container_name);
-
     let thread_app = app.to_owned();
-    let thread_container_name = arc_container_name.clone();
+    let thread_scene_name = scene_name.to_string();
+    let thread_service_id = service_id.to_string();
     let logs_handle = spawn(async move {
-        let service_log_event_name = format!("{thread_container_name}-log-event");
+        let service_log_event_name = format!("{thread_scene_name}-{thread_service_id}-log-event");
 
-        loop {
-            match does_container_exist(&docker, &thread_container_name).await {
-                Ok(true) => break,
-                Ok(false) => {
+        let container_name = loop {
+            match get_container_names_from_services(&thread_scene_name) {
+                Err(err) => {
                     thread_app
                         .emit_all(
                             service_log_event_name.as_ref(),
                             ServiceLogEventPayload {
-                                text: "Container does not exist for this service...".to_string(),
+                                text: format!("Error getting containers: {}", err),
                                 timestamp: get_formatted_date(None),
                                 clear: true,
                                 type_name: LogType::StdErr,
@@ -220,26 +258,34 @@ pub async fn start_emitting_service_logs(
                         )
                         .unwrap();
                 }
-                Err(error) => {
-                    thread_app
-                        .emit_all(
-                            service_log_event_name.as_ref(),
-                            ServiceLogEventPayload {
-                                text: format!("Could not retrieve service logs: {}", error),
-                                timestamp: get_formatted_date(None),
-                                clear: true,
-                                type_name: LogType::StdErr,
-                            },
-                        )
-                        .unwrap();
+                Ok(service_name_map) => {
+                    let container_name = service_name_map.get(&thread_service_id);
+
+                    match container_name {
+                        Some(container_name) => break container_name.to_string(),
+                        None => {
+                            thread_app
+                                .emit_all(
+                                    service_log_event_name.as_ref(),
+                                    ServiceLogEventPayload {
+                                        text: "Container does not exist for this service..."
+                                            .to_string(),
+                                        timestamp: get_formatted_date(None),
+                                        clear: true,
+                                        type_name: LogType::StdErr,
+                                    },
+                                )
+                                .unwrap();
+                        }
+                    }
+
+                    sleep(Duration::from_secs(1)).await;
                 }
             }
-
-            sleep(Duration::from_secs(1)).await;
-        }
+        };
 
         let mut logs_stream = docker.logs::<String>(
-            &thread_container_name,
+            &container_name,
             Some(LogsOptions::<String> {
                 follow: true,
                 tail: "all".to_string(),
@@ -314,11 +360,13 @@ pub async fn start_emitting_service_logs(
     });
 
     let state = app.state::<AppState>();
-    state
-        .container_log_handles
-        .lock()
-        .await
-        .insert(arc_container_name.to_string(), logs_handle);
+    state.service_log_handles.lock().await.insert(
+        ServiceLogKey {
+            scene_name: scene_name.to_string(),
+            service_id: service_id.to_string(),
+        },
+        logs_handle,
+    );
 
     Ok(())
 }
@@ -328,9 +376,11 @@ pub async fn stop_emitting_service_logs(
     scene_name: &str,
     service_id: &str,
 ) -> Result<(), String> {
-    let container_name = format!("{}-{}", scene_name, service_id);
-    let container_log_handles = state.container_log_handles.lock().await;
-    let log_handle = container_log_handles.get(&container_name);
+    let service_log_handles = state.service_log_handles.lock().await;
+    let log_handle = service_log_handles.get(&ServiceLogKey {
+        scene_name: scene_name.to_string(),
+        service_id: service_id.to_string(),
+    });
 
     match log_handle {
         Some(log_handle) => {
@@ -338,8 +388,8 @@ pub async fn stop_emitting_service_logs(
             Ok(())
         }
         None => Err(format!(
-            "Could not find the log emitting process for {}",
-            container_name
+            "Could not find the log emitting process for scene {} and service {}",
+            scene_name, service_id
         )),
     }
 }
@@ -370,105 +420,125 @@ pub fn start_emitting_service_status(
     let docker = Docker::connect_with_socket_defaults()
         .map_err(|error| format!("Cannot connect to docker socket: {}", error))?;
 
-    let container_name = format!("{}-{}", scene_name, service_id);
-    let app = app.to_owned();
+    let thread_app = app.to_owned();
+    let thread_scene_name = scene_name.to_string();
+    let thread_service_id = service_id.to_string();
 
-    // TODO: put handle in state
+    // FIXME: put handle in state
     let _status_handle = spawn(async move {
-        loop {
-            let service_status_event_name = &format!("{container_name}-status-event");
-            match does_container_exist(&docker, &container_name).await {
-                Ok(true) => {
-                    let inspect_result = docker
-                        .inspect_container(
-                            container_name.as_ref(),
-                            Some(InspectContainerOptions { size: false }),
-                        )
-                        .await;
+        let service_status_event_name =
+            &format!("{thread_scene_name}-{thread_service_id}-status-event");
 
-                    match inspect_result {
-                        Ok(container) => match &container.state {
-                            Some(state) => match &state.health {
-                                Some(health) => match health.status {
-                                    Some(status) => match status {
-                                        HealthStatusEnum::EMPTY | HealthStatusEnum::NONE => {
-                                            emit_service_status_by_status(
-                                                &app,
-                                                state,
-                                                service_status_event_name,
-                                            )
-                                        }
-                                        status => {
-                                            app.emit_all(
-                                                service_status_event_name,
-                                                ServiceStatusEventPayload {
-                                                    status: get_service_status_from_health_status(
-                                                        status,
-                                                    )
-                                                    .unwrap(),
-                                                    message: Some(format!("Status: {}", status)),
-                                                },
-                                            )
-                                            .unwrap();
-                                        }
-                                    },
-                                    None => emit_service_status_by_status(
-                                        &app,
-                                        state,
-                                        service_status_event_name,
-                                    ),
-                                },
-                                None => emit_service_status_by_status(
-                                    &app,
-                                    state,
-                                    service_status_event_name,
-                                ),
-                            },
-                            None => {
-                                app.emit_all(
-                                    service_status_event_name,
-                                    ServiceStatusEventPayload {
-                                        status: ServiceStatus::Paused,
-                                        message: None,
-                                    },
-                                )
-                                .unwrap();
-                            }
-                        },
-                        Err(error) => {
-                            app.emit_all(
-                                service_status_event_name,
-                                ServiceStatusEventPayload {
-                                    status: ServiceStatus::Error,
-                                    message: Some(format!(
-                                        "Error while retrieving service status: {}",
-                                        error
-                                    )),
+        loop {
+            let container_name = loop {
+                match get_container_names_from_services(&thread_scene_name) {
+                    Err(err) => {
+                        thread_app
+                            .emit_all(
+                                service_status_event_name.as_ref(),
+                                ServiceLogEventPayload {
+                                    text: format!("Error getting containers: {}", err),
+                                    timestamp: get_formatted_date(None),
+                                    clear: true,
+                                    type_name: LogType::StdErr,
                                 },
                             )
                             .unwrap();
+                    }
+                    Ok(service_name_map) => {
+                        let container_name = service_name_map.get(&thread_service_id);
+
+                        match container_name {
+                            Some(container_name) => break container_name.to_string(),
+                            None => {
+                                thread_app
+                                    .emit_all(
+                                        service_status_event_name,
+                                        ServiceStatusEventPayload {
+                                            status: ServiceStatus::Paused,
+                                            message: Some("Status: unexisting container".to_string()),
+                                        },
+                                    )
+                                    .unwrap();
+                            }
                         }
+
+                        sleep(Duration::from_secs(1)).await;
                     }
                 }
-                Ok(false) => {
-                    app.emit_all(
-                        service_status_event_name,
-                        ServiceStatusEventPayload {
-                            status: ServiceStatus::Paused,
-                            message: None,
+            };
+
+            let inspect_result = docker
+                .inspect_container(
+                    container_name.as_ref(),
+                    Some(InspectContainerOptions { size: false }),
+                )
+                .await;
+
+            match inspect_result {
+                Ok(container) => match &container.state {
+                    Some(state) => match &state.health {
+                        Some(health) => match health.status {
+                            Some(status) => match status {
+                                HealthStatusEnum::EMPTY | HealthStatusEnum::NONE => {
+                                    emit_service_status_by_status(
+                                        &thread_app,
+                                        state,
+                                        service_status_event_name,
+                                    )
+                                }
+                                status => {
+                                    thread_app
+                                        .emit_all(
+                                            service_status_event_name,
+                                            ServiceStatusEventPayload {
+                                                status: get_service_status_from_health_status(
+                                                    status,
+                                                )
+                                                .unwrap(),
+                                                message: Some(format!("Status: {}", status)),
+                                            },
+                                        )
+                                        .unwrap();
+                                }
+                            },
+                            None => emit_service_status_by_status(
+                                &thread_app,
+                                state,
+                                service_status_event_name,
+                            ),
                         },
-                    )
-                    .unwrap();
-                }
+                        None => emit_service_status_by_status(
+                            &thread_app,
+                            state,
+                            service_status_event_name,
+                        ),
+                    },
+                    None => {
+                        thread_app
+                            .emit_all(
+                                service_status_event_name,
+                                ServiceStatusEventPayload {
+                                    status: ServiceStatus::Paused,
+                                    message: None,
+                                },
+                            )
+                            .unwrap();
+                    }
+                },
                 Err(error) => {
-                    app.emit_all(
-                        service_status_event_name,
-                        ServiceStatusEventPayload {
-                            status: ServiceStatus::Error,
-                            message: Some(error),
-                        },
-                    )
-                    .unwrap();
+                    thread_app
+                        .emit_all(
+                            service_status_event_name,
+                            ServiceStatusEventPayload {
+                                status: ServiceStatus::Error,
+                                message: Some(format!(
+                                    "Error while retrieving service status: {}",
+                                    error
+                                )),
+                            },
+                        )
+                        .unwrap();
                 }
             }
 
@@ -477,24 +547,6 @@ pub fn start_emitting_service_status(
     });
 
     Ok(())
-}
-
-async fn does_container_exist(docker: &Docker, container_name: &str) -> Result<bool, String> {
-    let mut filters = HashMap::new();
-    filters.insert("name", vec![container_name]);
-
-    let options = Some(ListContainersOptions {
-        all: true,
-        filters,
-        ..Default::default()
-    });
-
-    let response = docker
-        .list_containers(options)
-        .await
-        .map_err(|error| format!("Cannot retrieve conatiners list: {}", error))?;
-
-    Ok(!response.is_empty())
 }
 
 fn emit_service_status_by_status(

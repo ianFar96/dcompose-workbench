@@ -179,63 +179,67 @@ export default function Scene() {
 
   return (
     <>
-      <div className='fixed top-3 left-3 z-10 flex items-center'>
-        <a className='mr-2' href='/scenes'>
-          <ArrowBack />
-        </a>
-        <h2 className='text-xl'>{sceneName}</h2>
-      </div>
+      <div className='flex flex-col h-screen'>
+        <div className='flex justify-between px-4 py-3 shadow-lg z-10'>
+          <div className='flex items-center'>
+            <a className='mr-2' href='/scenes'>
+              <ArrowBack />
+            </a>
+            <h2 className='text-xl'>{sceneName}</h2>
+          </div>
 
-      <div className='fixed top-2 right-2 z-10'>
-        <Button
-          className='w-10 h-10 min-w-[unset] p-2 mr-2'
-          onClick={openVsCode}
-          title='Open in VS Code'
-        >
-          <img alt='' src='/src/assets/vscode.svg' />
-        </Button>
+          <div>
+            <Button
+              className='w-10 h-10 min-w-[unset] p-2 mr-2'
+              onClick={openVsCode}
+              title='Open in VS Code'
+            >
+              <img alt='' src='/src/assets/vscode.svg' />
+            </Button>
 
-        <Button
-          className='w-10 h-10 min-w-[unset] p-0 mr-2'
-          disabled={isRunningScene}
-          onClick={startAll}
-          title='Start all services'
-          variant='outlined'
-        >
-          {isRunningScene ? <Refresh className='animate-spin' fontSize='large' /> : <PlayArrow fontSize='large' />}
-        </Button>
+            <Button
+              className='w-10 h-10 min-w-[unset] p-0 mr-2'
+              disabled={isRunningScene}
+              onClick={startAll}
+              title='Start all services'
+              variant='outlined'
+            >
+              {isRunningScene ? <Refresh className='animate-spin' fontSize='large' /> : <PlayArrow fontSize='large' />}
+            </Button>
 
-        <Button
-          className='w-10 h-10 min-w-[unset] p-0'
-          disabled={isStoppingScene}
-          onClick={stopAll}
-          title='Stop all services'
-          variant='outlined'
-        >
-          {isStoppingScene ? <Refresh className='animate-spin' fontSize='large' /> : <Stop fontSize='large' />}
-        </Button>
-      </div>
+            <Button
+              className='w-10 h-10 min-w-[unset] p-0'
+              disabled={isStoppingScene}
+              onClick={stopAll}
+              title='Stop all services'
+              variant='outlined'
+            >
+              {isStoppingScene ? <Refresh className='animate-spin' fontSize='large' /> : <Stop fontSize='large' />}
+            </Button>
+          </div>
+        </div>
 
-      <div style={{ height: '100vh', width: '100vw' }}>
-        <ReactFlow
-          edgeTypes={edgeTypes}
-          edges={edges}
-          fitView
-          nodeTypes={nodeTypes}
-          nodes={nodes}
-          onConnect={onConnect}
-          onEdgesChange={onEdgesChange}
-          onEdgesDelete={onEdgesDelete}
-          onNodesChange={onNodesChange}
-        >
-          <Background />
-          <MiniMap />
-          <Controls >
-            <ControlButton onClick={onLayout}>
-              <ReplayIcon />
-            </ControlButton>
-          </Controls>
-        </ReactFlow>
+        <div className='h-full w-screen'>
+          <ReactFlow
+            edgeTypes={edgeTypes}
+            edges={edges}
+            fitView
+            nodeTypes={nodeTypes}
+            nodes={nodes}
+            onConnect={onConnect}
+            onEdgesChange={onEdgesChange}
+            onEdgesDelete={onEdgesDelete}
+            onNodesChange={onNodesChange}
+          >
+            <Background />
+            <MiniMap />
+            <Controls >
+              <ControlButton onClick={onLayout}>
+                <ReplayIcon />
+              </ControlButton>
+            </Controls>
+          </ReactFlow>
+        </div>
       </div>
     </>
   );

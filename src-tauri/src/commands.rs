@@ -27,7 +27,7 @@ pub struct Service {
     pub id: String,
     pub label: String,
     #[serde(rename = "type")]
-    pub type_name: String,
+    pub type_name: Option<String>,
     #[serde(rename = "dependsOn")]
     pub depends_on: HashMap<String, DependsOn>,
 }
@@ -68,8 +68,14 @@ pub fn get_scene_services(app: AppHandle, scene_name: &str) -> Result<Vec<Servic
     for (service_id, service) in docker_compose_file.services {
         services.push(Service {
             id: service_id.clone(),
-            label: service.labels.service_name,
-            type_name: service.labels.service_type,
+            label: match service.labels {
+                None => service_id.clone(),
+                Some(ref labels) => labels.service_name.clone().unwrap_or(service_id.clone()),
+            },
+            type_name: match service.labels {
+                None => None,
+                Some(labels) => labels.service_type,
+            },
             depends_on: service
                 .depends_on
                 .unwrap_or(HashMap::new())
