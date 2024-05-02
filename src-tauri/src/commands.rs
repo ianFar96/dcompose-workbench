@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fs, process::Command};
+use std::{
+    collections::HashMap,
+    fs::{self},
+    path::PathBuf,
+    process::Command,
+};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
@@ -191,10 +196,98 @@ pub fn set_dependency_condition(
 }
 
 #[tauri::command(async)]
-pub fn open_vscode(scene_name: &str) -> Result<(), String> {
-    Command::new("code")
-        .arg(format!("/home/mia/.dcompose-workbench/scenes/{scene_name}"))
-        .spawn().map_err(|err| format!("Unable to open vs-code in /home/mia/.dcompose-workbench/scenes/{scene_name}: {err}"))?;
+pub fn open_vscode(
+    scene_name: &str,
+    service_id: Option<&str>,
+    filepath: Option<&str>,
+) -> Result<(), String> {
+    let mut args = vec![];
+
+    let binding = format!("/home/mia/.dcompose-workbench/scenes/{scene_name}");
+    let mut path = PathBuf::from(&binding);
+    if let Some(service_id) = service_id {
+        path = path.join(service_id);
+    }
+    args.push(path.to_string_lossy().to_string());
+
+    if let Some(filepath) = filepath {
+        args.push("-g".to_string());
+        let absolute_filepath = path.join(filepath);
+        args.push(absolute_filepath.to_string_lossy().to_string());
+    }
+
+    Command::new("code").args(args).spawn().map_err(|err| {
+        format!(
+            "Unable to open vs-code in /home/mia/.dcompose-workbench/scenes/{scene_name}: {err}"
+        )
+    })?;
 
     Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ServiceAssets {
+    Leaf,
+    Node(HashMap<String, ServiceAssets>),
+}
+
+#[tauri::command(async)]
+pub fn get_service_assets(
+    scene_name: &str,
+    service_id: &str,
+) -> Result<HashMap<String, ServiceAssets>, String> {
+    let service_assets_dirpath = get_config_dirpath()
+        .join("scenes")
+        .join(scene_name)
+        .join(service_id);
+
+    get_service_assets_recursive(
+        service_assets_dirpath,
+        scene_name,
+        service_id,
+    )
+}
+
+fn get_service_assets_recursive(
+    dirpath: PathBuf,
+    scene_name: &str,
+    service_id: &str,
+) -> Result<HashMap<String, ServiceAssets>, String> {
+    let mut service_assets = HashMap::new();
+    
+    match dirpath.try_exists() {
+        Ok(exists) => {
+            if exists {
+                let dir = fs::read_dir(dirpath.clone())
+                    .map_err(|err| format!("Cannot read service assets folder for scene {scene_name} and service {service_id}: {err}"))?;
+                for entry in dir.into_iter() {
+                    let entry = entry.unwrap();
+                    
+                    let is_dir = entry.path().is_dir();
+                    if is_dir {
+                        let next_service_assets = get_service_assets_recursive(entry.path(), scene_name, service_id)?;
+
+                        let dir_name = entry.path().iter().last().unwrap().to_string_lossy().to_string();
+                        service_assets.insert(
+                            dir_name,
+                            ServiceAssets::Node(next_service_assets)
+                        );
+                    } else {
+                        let file_name = entry.file_name().to_string_lossy().to_string();
+                        service_assets.insert(
+                            file_name,
+                            ServiceAssets::Leaf,
+                        );
+                    }
+    
+                }
+            }
+        }
+        Err(err) => return Err(format!(
+            "Cannot read service assets folder for scene {scene_name} and service {service_id}: {err}"
+        )),
+    }
+
+    Ok(service_assets)
 }

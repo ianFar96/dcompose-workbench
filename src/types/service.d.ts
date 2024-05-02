@@ -18,3 +18,7 @@ export type ServiceYaml = Record<string, unknown>
 export type ServiceDependency = {
   condition: DependsOnCondition
 }
+
+export type ServiceAssets = {
+  [key: string]: ServiceAssets | null
+}

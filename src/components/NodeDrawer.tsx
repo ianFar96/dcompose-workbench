@@ -1,11 +1,12 @@
-import { ArrowBack, Edit, Search } from '@mui/icons-material';
+import { ArrowBack, Edit, Folder, Search } from '@mui/icons-material';
 import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
 import React, { useMemo, useState } from 'react';
 
 import EditService from './EditService';
+import EditServiceVolumes from './EditServiceAssets';
 import ServiceLogs from './ServiceLogs';
 
-type Pages = undefined | 'logs' | 'edit'
+type Pages = undefined | 'logs' | 'edit' | 'assets'
 
 type NodeDrawerProps = {
   serviceId: string
@@ -37,7 +38,7 @@ export default function NodeDrawer(props: NodeDrawerProps) {
 
     case 'edit':
       return (
-        <Box className='max-w-[75vw] min-w-[500px] h-screen flex flex-col' role='presentation'>
+        <Box className='w-[75vw] h-screen flex flex-col' role='presentation'>
           <div className='flex justify-between items-center px-6 py-4'>
             <div className='flex items-center'>
               <button
@@ -53,6 +54,24 @@ export default function NodeDrawer(props: NodeDrawerProps) {
           <hr />
 
           <EditService sceneName={props.sceneName} serviceId={props.serviceId}/>
+        </Box>
+      );
+
+    case 'assets':
+      return (
+        <Box className='max-w-[450px] h-screen flex flex-col' role='presentation'>
+          <div className='flex items-center px-6 py-4'>
+            <button
+              className='mr-2 -ml-2'
+              onClick={() => setPage(undefined)}
+            >
+              <ArrowBack fontSize='small' />
+            </button>
+            <h2 className='text-lg whitespace-nowrap'>{props.serviceId}</h2>
+          </div>
+          <hr />
+
+          <EditServiceVolumes sceneName={props.sceneName} serviceId={props.serviceId}/>
         </Box>
       );
 
@@ -80,6 +99,14 @@ export default function NodeDrawer(props: NodeDrawerProps) {
                   <Edit />
                 </ListItemIcon>
                 <ListItemText primary='Edit' />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => setPage('assets')}>
+                <ListItemIcon>
+                  <Folder />
+                </ListItemIcon>
+                <ListItemText primary='Assets' />
               </ListItemButton>
             </ListItem>
           </List>

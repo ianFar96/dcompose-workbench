@@ -75,7 +75,13 @@ export default function EditService(props: EditServiceProps) {
             </Alert>
           </Snackbar>
 
-          <Editor defaultLanguage='yaml' defaultValue={serviceYamlString} onMount={onMount} theme='vs-dark' />
+          <Editor
+            defaultLanguage='yaml'
+            defaultValue={serviceYamlString}
+            onMount={onMount}
+            options={{ scrollBeyondLastLine: false }}
+            theme='vs-dark'
+          />
         </>
       ) : undefined}
     </>
