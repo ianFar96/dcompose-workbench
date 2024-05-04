@@ -67,9 +67,26 @@ pub fn get_scenes() -> Result<Vec<Scene>, String> {
 }
 
 #[tauri::command(async)]
+pub fn create_scene(scene_name: &str) -> Result<(), String> {
+    let (scene_name_length, _) = PathBuf::from(scene_name).iter().size_hint();
+    if scene_name_length > 1 {
+        return Err("Cannot create a scene within other folders".to_string());
+    }
+
+    let scene_path = get_config_dirpath().join("scenes").join(scene_name);
+    fs_extra::dir::create(&scene_path, false)
+        .map_err(|err| format!("Could not create scene folder {scene_name}: {err}"))?;
+
+    let docker_compose_path = scene_path.join("docker-compose.yml");
+    let docker_compose_contents = "services: {}";
+    fs::write(docker_compose_path, docker_compose_contents)
+        .map_err(|err| format!("Could not create docker-compose.yml for scene {scene_name}: {err}"))
+}
+
+#[tauri::command(async)]
 pub fn delete_scene(scene_name: &str) -> Result<(), String> {
     let scene_path = get_config_dirpath().join("scenes").join(scene_name);
-    fs::remove_dir(scene_path).map_err(|err| format!("Could not delete scene: {err}"))
+    fs::remove_dir_all(scene_path).map_err(|err| format!("Could not delete scene: {err}"))
 }
 
 #[tauri::command(async)]

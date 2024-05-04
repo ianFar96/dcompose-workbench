@@ -9,6 +9,7 @@ async fn main() {
         .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
             commands::get_scenes,
+            commands::create_scene,
             commands::delete_scene,
             commands::get_scene_services,
             commands::get_service,
