@@ -1,4 +1,7 @@
-use std::{path::{Path, PathBuf}, time::SystemTime};
+use std::{
+    path::{Path, PathBuf},
+    time::SystemTime,
+};
 
 use chrono::{DateTime, Utc};
 use tauri::api::path::home_dir;
@@ -12,6 +15,5 @@ pub fn get_formatted_date(date: Option<DateTime<Utc>>) -> String {
 }
 
 pub fn get_config_dirpath() -> PathBuf {
-    Path::new(&home_dir().unwrap())
-        .join(".dcompose-workbench")
+    Path::new(&home_dir().unwrap()).join(".dcompose-workbench")
 }

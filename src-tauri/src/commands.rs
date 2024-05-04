@@ -1,6 +1,6 @@
 use std::{
-    collections::HashMap,
-    fs::{self},
+    collections::{BTreeMap, HashMap},
+    fs,
     path::PathBuf,
     process::Command,
 };
@@ -225,37 +225,33 @@ pub fn open_vscode(
     Ok(())
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum ServiceAssets {
     Leaf,
-    Node(HashMap<String, ServiceAssets>),
+    Node(BTreeMap<String, ServiceAssets>),
 }
 
 #[tauri::command(async)]
 pub fn get_service_assets(
     scene_name: &str,
     service_id: &str,
-) -> Result<HashMap<String, ServiceAssets>, String> {
+) -> Result<BTreeMap<String, ServiceAssets>, String> {
     let service_assets_dirpath = get_config_dirpath()
         .join("scenes")
         .join(scene_name)
         .join(service_id);
 
-    get_service_assets_recursive(
-        service_assets_dirpath,
-        scene_name,
-        service_id,
-    )
+    get_service_assets_recursive(service_assets_dirpath, scene_name, service_id)
 }
 
 fn get_service_assets_recursive(
     dirpath: PathBuf,
     scene_name: &str,
     service_id: &str,
-) -> Result<HashMap<String, ServiceAssets>, String> {
-    let mut service_assets = HashMap::new();
-    
+) -> Result<BTreeMap<String, ServiceAssets>, String> {
+    let mut service_assets = BTreeMap::new();
+
     match dirpath.try_exists() {
         Ok(exists) => {
             if exists {
@@ -263,7 +259,7 @@ fn get_service_assets_recursive(
                     .map_err(|err| format!("Cannot read service assets folder for scene {scene_name} and service {service_id}: {err}"))?;
                 for entry in dir.into_iter() {
                     let entry = entry.unwrap();
-                    
+
                     let is_dir = entry.path().is_dir();
                     if is_dir {
                         let next_service_assets = get_service_assets_recursive(entry.path(), scene_name, service_id)?;
@@ -280,7 +276,6 @@ fn get_service_assets_recursive(
                             ServiceAssets::Leaf,
                         );
                     }
-    
                 }
             }
         }
@@ -290,4 +285,79 @@ fn get_service_assets_recursive(
     }
 
     Ok(service_assets)
+}
+
+#[tauri::command(async)]
+pub fn copy_target_entry(
+    scene_name: &str,
+    service_id: &str,
+    source: &str,
+    target: &str,
+) -> Result<(), String> {
+    let source_path = PathBuf::from(source);
+    match source_path.try_exists() {
+        Err(err) => return Err(format!("Cannot read source path {source}: {err}")),
+        Ok(false) => return Err(format!("Folder {source} does not exist in this system")),
+        _ => {}
+    }
+
+    let target_path = get_config_dirpath()
+        .join("scenes")
+        .join(scene_name)
+        .join(service_id)
+        .join(target);
+
+    match target_path.try_exists() {
+        Err(err) => return Err(format!("Cannot read target path {source}: {err}")),
+        Ok(true) => return Err("entry_already_exists".to_string()),
+        _ => {}
+    }
+
+    match source_path.is_dir() {
+        true => {
+            // Create all dirs, even the last bit since we'll copy only the contents
+            fs_extra::dir::create_all(&target_path, false).map_err(|err| {
+                format!(
+                    "Could not create missing folders in {}: {err}",
+                    target_path.to_str().unwrap()
+                )
+            })?;
+
+            let options = fs_extra::dir::CopyOptions {
+                content_only: true,
+                ..Default::default()
+            };
+            fs_extra::dir::copy(source_path, &target_path, &options).map_err(|err| {
+                format!(
+                    "Could not copy files from {} to {}: {err}",
+                    source,
+                    target_path.to_str().unwrap()
+                )
+            })?;
+        }
+        false => {
+            // Create all dirs up to the file if necessary
+            let mut target_base_dir = target_path.clone();
+            target_base_dir.pop();
+            if let Ok(false) = target_base_dir.try_exists() {
+                fs_extra::dir::create_all(&target_base_dir, false).map_err(|err| {
+                    format!(
+                        "Could not create missing folders in {}: {err}",
+                        target_path.to_str().unwrap()
+                    )
+                })?;
+            }
+
+            let options = fs_extra::file::CopyOptions::new();
+            fs_extra::file::copy(source_path, &target_path, &options).map_err(|err| {
+                format!(
+                    "Could not copy files from {} to {}: {err}",
+                    source,
+                    target_path.to_str().unwrap()
+                )
+            })?;
+        }
+    }
+
+    Ok(())
 }

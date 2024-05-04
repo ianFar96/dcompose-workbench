@@ -25,6 +25,7 @@ async fn main() {
             commands::delete_dependency,
             commands::set_dependency_condition,
             commands::open_vscode,
+            commands::copy_target_entry,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

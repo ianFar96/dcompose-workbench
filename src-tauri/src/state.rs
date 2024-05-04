@@ -5,7 +5,7 @@ use tokio::{sync::Mutex, task::JoinHandle};
 #[derive(Eq, Hash, PartialEq)]
 pub struct ServiceKey {
     pub scene_name: String,
-    pub service_id: String
+    pub service_id: String,
 }
 
 pub struct AppState {
