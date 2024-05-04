@@ -7,7 +7,11 @@ export default {
   important: true,
   plugins: [],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        error: '#d32f2f',
+      },
+    },
   },
 };
 

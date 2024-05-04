@@ -1,3 +1,4 @@
+import { ConfirmProvider } from 'material-ui-confirm';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import {
@@ -24,5 +25,10 @@ const router = createBrowserRouter([{
 redirect('/scenes');
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <RouterProvider router={router} />
+  <ConfirmProvider defaultOptions={{
+    cancellationButtonProps: { variant: 'outlined' },
+    confirmationButtonProps: { variant: 'outlined' },
+  }}>
+    <RouterProvider router={router} />
+  </ConfirmProvider>
 );

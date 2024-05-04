@@ -24,6 +24,7 @@
     "dagre": "^0.8.5",
     "localforage": "^1.10.0",
     "match-sorter": "^6.3.4",
+    "material-ui-confirm": "^3.0.12",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.23.0",

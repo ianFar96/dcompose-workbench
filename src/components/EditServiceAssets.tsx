@@ -208,7 +208,7 @@ export default function EditServiceAssets(props: EditServiceAssetsProps) {
             </div>
 
             <div className='mb-4'>
-              <label className={`block mb-1 ${doesEntryExist ? 'text-[#d32f2f]' : ''}`}>Target</label>
+              <label className={`block mb-1 ${doesEntryExist ? 'text-error' : ''}`}>Target</label>
               <TextField
                 InputProps={{
                   startAdornment: <InputAdornment position='start'>

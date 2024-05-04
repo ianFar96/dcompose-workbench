@@ -67,6 +67,12 @@ pub fn get_scenes() -> Result<Vec<Scene>, String> {
 }
 
 #[tauri::command(async)]
+pub fn delete_scene(scene_name: &str) -> Result<(), String> {
+    let scene_path = get_config_dirpath().join("scenes").join(scene_name);
+    fs::remove_dir(scene_path).map_err(|err| format!("Could not delete scene: {err}"))
+}
+
+#[tauri::command(async)]
 pub async fn get_scene_services(scene_name: &str) -> Result<Vec<Service>, String> {
     let docker_compose_file = docker::get_docker_compose_file(scene_name)?;
     let mut services: Vec<Service> = vec![];
