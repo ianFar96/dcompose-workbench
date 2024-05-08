@@ -32,10 +32,7 @@ export default function EdgeDrawer(props: EdgeDrawerProps) {
       .then(() => {
         setEdges(edges => edges.filter(edge => edge.id !== props.edge.id));
       })
-      .catch(error => {
-        // TODO: un bell'alert
-        console.error(error);
-      });
+      .catch(error => alert(error));
   }, [props.edge, props.sceneName, setEdges]);
 
   return (

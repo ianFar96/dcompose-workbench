@@ -1,9 +1,9 @@
 import { Error, Pause, PlayArrow, QuestionMark, Refresh } from '@mui/icons-material';
 import { Button, Card, CardContent, Chip, Drawer, Typography } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Node, NodeProps } from 'reactflow';
-import { Handle, Position, useReactFlow } from 'reactflow';
+import React, { useCallback, useMemo, useState } from 'react';
+import type { NodeProps } from 'reactflow';
+import { Handle, Position } from 'reactflow';
 
 import useTauriEvent from '../hooks/useTauriEvent';
 import type { ServiceStatus, StatusEventPayload } from '../types/service';
@@ -32,10 +32,7 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
     invoke('run_service', {
       sceneName: props.data.sceneName,
       serviceId: props.data.serviceId,
-    }).catch(error => {
-      // TODO: un bell'alert
-      console.error(error);
-    });
+    }).catch(error => alert(error));
   }, [props.data.sceneName, props.data.serviceId]);
 
   const stop = useCallback(() => {
@@ -44,10 +41,7 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
     invoke('stop_service', {
       sceneName: props.data.sceneName,
       serviceId: props.data.serviceId,
-    }).catch(error => {
-      // TODO: un bell'alert
-      console.error(error);
-    });
+    }).catch(error => alert(error));
   }, [props.data.sceneName, props.data.serviceId]);
 
   const actionButton = useMemo(() => {

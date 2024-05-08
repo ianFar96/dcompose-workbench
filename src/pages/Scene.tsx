@@ -78,10 +78,8 @@ export default function Scene() {
       setServices(services);
 
       for (const service of services) {
-        invoke('start_emitting_service_status', { sceneName, serviceId: service.id }).catch(error => {
-          // TODO: un bell'alert
-          console.error(error);
-        });
+        invoke('start_emitting_service_status', { sceneName, serviceId: service.id })
+          .catch(error => alert(error));
         unlistenStatusFns.push(invoke.bind(undefined, 'stop_emitting_service_status', { sceneName, serviceId: service.id }));
       }
 
@@ -123,13 +121,9 @@ export default function Scene() {
 
   useEffect(() => {
     loadScene();
-
     return () => {
       for (const unlisten of unlistenStatusFns) {
-        unlisten().catch(error => {
-          // TODO: un bell'alert
-          console.error(error);
-        });
+        unlisten().catch(error => alert(error));
       }
     };
   }, [setNodes, setEdges, sceneName, loadScene, unlistenStatusFns]);
@@ -147,10 +141,7 @@ export default function Scene() {
           type: 'custom',
         }, edges));
       })
-      .catch(error => {
-        // TODO: un bell'alert
-        console.error(error);
-      });
+      .catch(error => alert(error));
   }, [sceneName, setEdges]);
 
   const onEdgesDelete = useCallback((edgesToDelete: Edge[]) => {
@@ -159,10 +150,7 @@ export default function Scene() {
         .then(() => {
           setEdges(edges => edges.filter(edge => !edgesToDelete.includes(edge)));
         })
-        .catch(error => {
-        // TODO: un bell'alert
-          console.error(error);
-        });
+        .catch(error => alert(error));
     }
   }, [sceneName, setEdges]);
 
@@ -176,10 +164,7 @@ export default function Scene() {
   const startAll = useCallback(() => {
     setIsRunningScene(true);
     invoke('run_scene', { sceneName })
-      .catch(error => {
-        // TODO: un bell'alert
-        console.error(error);
-      })
+      .catch(error => alert(error))
       .finally(() => {
         setIsRunningScene(false);
       });
@@ -189,10 +174,7 @@ export default function Scene() {
   const stopAll = useCallback(() => {
     setIsStoppingScene(true);
     invoke('stop_scene', { sceneName })
-      .catch(error => {
-        // TODO: un bell'alert
-        console.error(error);
-      })
+      .catch(error => alert(error))
       .finally(() => {
         setIsStoppingScene(false);
       });
@@ -200,18 +182,12 @@ export default function Scene() {
 
   const openVsCode = useCallback(() => {
     invoke('open_vscode', { sceneName })
-      .catch(error => {
-        // TODO: un bell'alert
-        console.error(error);
-      });
+      .catch(error => alert(error));
   }, [sceneName]);
 
   const reloadScene = useCallback(() => {
     for (const unlisten of unlistenStatusFns) {
-      unlisten().catch(error => {
-        // TODO: un bell'alert
-        console.error(error);
-      });
+      unlisten().catch(error => alert(error));
     }
 
     loadScene();

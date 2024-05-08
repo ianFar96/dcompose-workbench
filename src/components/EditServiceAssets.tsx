@@ -65,10 +65,7 @@ export default function EditServiceAssets(props: EditServiceAssetsProps) {
       .then(assets => {
         setAssets(assets);
       })
-      .catch(error => {
-      // TODO: un bell'alert
-        console.error(error);
-      });
+      .catch(error => alert(error));
   }, [props.sceneName, props.serviceId]);
 
   useEffect(() => {
@@ -77,10 +74,7 @@ export default function EditServiceAssets(props: EditServiceAssetsProps) {
 
   const openVsCode = useCallback((filepath?: string) => {
     invoke('open_vscode', { filepath, sceneName: props.sceneName, serviceId: props.serviceId })
-      .catch(error => {
-        // TODO: un bell'alert
-        console.error(error);
-      });
+      .catch(error => alert(error));
   }, [props.sceneName, props.serviceId]);
 
   const [selectedEntry, setSelectedEntry] = useState<string|null>(null);
@@ -97,19 +91,10 @@ export default function EditServiceAssets(props: EditServiceAssetsProps) {
           setDoesEntryExist(false);
           path.basename(selected as string).then(basename => {
             setTargetPath(basename);
-          }).catch(error => {
-            // TODO: un bell'alert
-            console.error(error);
-          });
+          }).catch(error => alert(error));
         }
-      }).catch(error => {
-        // TODO: un bell'alert
-        console.error(error);
-      });
-    }).catch(error => {
-      // TODO: un bell'alert
-      console.error(error);
-    });
+      }).catch(error => alert(error));
+    }).catch(error => alert(error));
   }, []);
 
   const onClickFolder = useCallback(() => {
@@ -123,10 +108,7 @@ export default function EditServiceAssets(props: EditServiceAssetsProps) {
           setDoesEntryExist(false);
           path.basename(selected as string).then(basename => {
             setTargetPath(basename);
-          }).catch(error => {
-            // TODO: un bell'alert
-            console.error(error);
-          });
+          }).catch(error => alert(error));
         }
       }).catch(_ => {});
     }).catch(_ => {});

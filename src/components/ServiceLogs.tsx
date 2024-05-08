@@ -35,16 +35,12 @@ export default function ServiceLogs(props: ServiceLogsProps) {
   });
 
   useEffect(() => {
-    invoke('start_emitting_service_logs', { sceneName: props.sceneName, serviceId: props.serviceId }).catch(error => {
-      // TODO: un bell'alert
-      console.error(error);
-    });
+    invoke('start_emitting_service_logs', { sceneName: props.sceneName, serviceId: props.serviceId })
+      .catch(error => alert(error));
 
     return () => {
-      invoke('stop_emitting_service_logs', { sceneName: props.sceneName, serviceId: props.serviceId }).catch(error => {
-        // TODO: un bell'alert
-        console.error(error);
-      });
+      invoke('stop_emitting_service_logs', { sceneName: props.sceneName, serviceId: props.serviceId })
+        .catch(error => alert(error));
     };
   }, [props.sceneName, props.serviceId]);
 
