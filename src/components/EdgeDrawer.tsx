@@ -20,10 +20,7 @@ export default function EdgeDrawer(props: EdgeDrawerProps) {
       sceneName: props.sceneName,
       source: props.edge.source,
       target: props.edge.target,
-    }).catch(error => {
-      // TODO: un bell'allert
-      console.error(error);
-    });
+    }).catch(error => alert(error));
   }, [props.sceneName, props.edge.source, props.edge.target]);
 
   const { setEdges } = useReactFlow();

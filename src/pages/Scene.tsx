@@ -1,19 +1,16 @@
-import { ArrowBack, MoreVert, PlayArrow, Refresh, Stop } from '@mui/icons-material';
 import ReplayIcon from '@mui/icons-material/Replay';
-import { Button } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
 import dagre from 'dagre';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import type { Connection, Edge, Node } from 'reactflow';
 import { Background, ControlButton, Controls, MiniMap, Position, default as ReactFlow, addEdge, useEdgesState, useNodesState } from 'reactflow';
 
-import CreateServiceDrawer from '../components/CreateServiceDrawer';
 import type { CustomEdgeData } from '../components/CustomEdge';
 import CustomEdge from '../components/CustomEdge';
 import type { CustomNodeData } from '../components/CustomNode';
 import CustomNode from '../components/CustomNode';
-import SceneMenu from '../components/SceneMenu';
+import SceneHeader from '../components/SceneHeader';
 import type { Service } from '../types/service';
 
 import '@fontsource/roboto/300.css';
@@ -59,8 +56,6 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
 };
 
 export default function Scene() {
-  const navigate = useNavigate();
-
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
   const edgeTypes = useMemo(() => ({ custom: CustomEdge }), []);
 
@@ -70,12 +65,11 @@ export default function Scene() {
   const { sceneName } = useParams();
   if (!sceneName) { throw new Error(); }
 
-  const [services, setServices] = useState<Service[]>([]);
-
+  const [serviceIds, setServiceIds] = useState<string[]>([]);
   const unlistenStatusFns: (() => Promise<unknown>)[] = useMemo(() => [], []);
   const loadScene = useCallback(() => {
     invoke<Service[]>('get_scene_services', { sceneName }).then(services => {
-      setServices(services);
+      setServiceIds(services.map(service => service.id));
 
       for (const service of services) {
         invoke('start_emitting_service_status', { sceneName, serviceId: service.id })
@@ -160,31 +154,6 @@ export default function Scene() {
     setEdges([...layoutedEdges]);
   }, [nodes, edges, setNodes, setEdges]);
 
-  const [isRunningScene, setIsRunningScene] = useState(false);
-  const startAll = useCallback(() => {
-    setIsRunningScene(true);
-    invoke('run_scene', { sceneName })
-      .catch(error => alert(error))
-      .finally(() => {
-        setIsRunningScene(false);
-      });
-  }, [sceneName]);
-
-  const [isStoppingScene, setIsStoppingScene] = useState(false);
-  const stopAll = useCallback(() => {
-    setIsStoppingScene(true);
-    invoke('stop_scene', { sceneName })
-      .catch(error => alert(error))
-      .finally(() => {
-        setIsStoppingScene(false);
-      });
-  }, [sceneName]);
-
-  const openVsCode = useCallback(() => {
-    invoke('open_vscode', { sceneName })
-      .catch(error => alert(error));
-  }, [sceneName]);
-
   const reloadScene = useCallback(() => {
     for (const unlisten of unlistenStatusFns) {
       unlisten().catch(error => alert(error));
@@ -203,82 +172,13 @@ export default function Scene() {
     return () => { window.removeEventListener('keydown', callback); };
   }, [reloadScene]);
 
-  const [isMenuShown, setIsMenuShown] = useState(false);
-  const triggerMenuRef = useRef(null);
-
-  const [isCreateServiceDrawerOpen, setIsCreateDrawerDialogOpen] = useState(false);
-  const handleCreateService = useCallback((serviceId: string, code: string) => {
-    invoke('create_service', { code, sceneName, serviceId }).then(() => {
-      setIsCreateDrawerDialogOpen(false);
-      reloadScene();
-    }).catch(error => {
-      // TODO: un bell'allert
-      console.error(error);
-    });
-  }, [reloadScene, sceneName]);
-
   return (
     <>
       <div className='flex flex-col h-screen'>
-        <div className='flex justify-between px-4 py-3 shadow-lg z-10'>
-          <div className='flex items-center'>
-            <button className='mr-2 p-0' onClick={() => navigate('/scenes')}>
-              <ArrowBack />
-            </button>
-            <h2 className='text-xl'>{sceneName}</h2>
-          </div>
-
-          <div>
-            <Button
-              className='w-10 h-10 min-w-[unset] p-0 mr-2'
-              disabled={isRunningScene}
-              onClick={startAll}
-              title='Start all services'
-              variant='outlined'
-            >
-              {isRunningScene ? <Refresh className='animate-spin' fontSize='large' /> : <PlayArrow fontSize='large' />}
-            </Button>
-
-            <Button
-              className='w-10 h-10 min-w-[unset] p-0 mr-2'
-              disabled={isStoppingScene}
-              onClick={stopAll}
-              title='Stop all services'
-              variant='outlined'
-            >
-              {isStoppingScene ? <Refresh className='animate-spin' fontSize='large' /> : <Stop fontSize='large' />}
-            </Button>
-
-            <button
-              className='w-4 h-10 min-w-[unset] p-0'
-              color='inherit'
-              onClick={() => setIsMenuShown(!isMenuShown)}
-              ref={triggerMenuRef}
-            >
-              <MoreVert />
-            </button>
-          </div>
-        </div>
-
-        {triggerMenuRef.current ? (
-          <SceneMenu
-            actions={{
-              createService: () => setIsCreateDrawerDialogOpen(true),
-              openVsCode,
-              reloadScene,
-            }}
-            anchorEl={triggerMenuRef.current}
-            handleClose={() => setIsMenuShown(false)}
-            open={isMenuShown}
-          />
-        ) : undefined}
-
-        <CreateServiceDrawer
-          handleClose={() => setIsCreateDrawerDialogOpen(false)}
-          handleSubmit={handleCreateService}
-          open={isCreateServiceDrawerOpen}
+        <SceneHeader
+          reloadScene={reloadScene}
           sceneName={sceneName}
-          serviceIds={services.map(service => service.id)}
+          serviceIds={serviceIds}
         />
 
         <div className='h-full w-screen'>

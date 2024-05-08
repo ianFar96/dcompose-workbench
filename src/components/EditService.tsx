@@ -25,10 +25,7 @@ export default function EditService(props: EditServiceProps) {
         .then(service => {
           setServiceYamlString(YAML.stringify(service));
         })
-        .catch(error => {
-          // TODO: un bell'allert
-          console.error(error);
-        });
+        .catch(error => alert(error));
     }
   }, [props.sceneName, props.serviceId]);
 
@@ -67,20 +64,20 @@ export default function EditService(props: EditServiceProps) {
       <div className='px-4 py-3'>
         <TextField
           autoFocus
+          defaultValue={props.serviceId}
           error={isServiceIdTaken}
           fullWidth
           helperText={`${isServiceIdTaken ? 'A service with that Id already exists' : 'Use only alphanumeric characters, `-`, `/`, `:` and `_`.'}`}
           name='serviceId'
           placeholder='Service Id'
           size='small'
-          defaultValue={props.serviceId}
           type='text'
           variant='outlined'
         />
       </div>
 
-      {!props.serviceId || serviceYamlString ?
-        <Editor
+      {!props.serviceId || serviceYamlString
+        ? <Editor
           className='h-full'
           defaultLanguage='yaml'
           defaultValue={serviceYamlString ?? defaultServiceTemplate}

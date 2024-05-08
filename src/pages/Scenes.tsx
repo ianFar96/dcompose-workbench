@@ -16,10 +16,7 @@ export default function Scenes() {
   const loadScenes = useCallback(() => {
     invoke<Scene[]>('get_scenes').then(scenes => {
       setScenes(scenes);
-    }).catch(error => {
-      // TODO: un bell'allert
-      console.error(error);
-    });
+    }).catch(error => alert(error));
   }, []);
 
   useEffect(() => {
@@ -38,10 +35,7 @@ export default function Scenes() {
     }).then(() => {
       invoke('delete_scene', { sceneName }).then(() => {
         loadScenes();
-      }).catch(error => {
-        // TODO:: un bell'allert
-        console.error(error);
-      });
+      }).catch(error => alert(error));
     }).catch(() => {});
   }, [confirm, loadScenes]);
 
@@ -50,10 +44,7 @@ export default function Scenes() {
     invoke('create_scene', { sceneName }).then(() => {
       setIsCreateSceneDialogOpen(false);
       loadScenes();
-    }).catch(error => {
-      // TODO: un bell'allert
-      console.error(error);
-    });
+    }).catch(error => alert(error));
   }, [loadScenes]);
 
   return (

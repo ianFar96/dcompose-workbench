@@ -46,62 +46,62 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
 
   const actionButton = useMemo(() => {
     switch (status) {
-      case 'paused':
-        return (
-          <Button
-            className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
-            onClick={run}
-            title={statusText}
-            variant='outlined'
-          >
-            <PlayArrow fontSize='small' />
-          </Button>
-        );
-      case 'running':
-        return (
-          <Button
-            className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
-            onClick={stop}
-            title={statusText}
-            variant='outlined'
-          >
-            <Pause fontSize='small' />
-          </Button>
-        );
-      case 'loading':
-        return (
-          <Button
-            className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
-            onClick={stop}
-            title={statusText}
-            variant='outlined'
-          >
-            <Refresh className='animate-spin' fontSize='small' />
-          </Button>
-        );
-      case 'error':
-        return (
-          <Button
-            className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
-            color='error'
-            onClick={stop}
-            title={statusText}
-            variant='outlined'
-          >
-            <Error fontSize='small' />
-          </Button>
-        );
-      case 'unknown':
-        return (
-          <Button
-            className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
-            disabled
-            title={statusText}
-            variant='outlined'
-          >
-            <QuestionMark fontSize='small' />
-          </Button>
-        );
+    case 'paused':
+      return (
+        <Button
+          className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
+          onClick={run}
+          title={statusText}
+          variant='outlined'
+        >
+          <PlayArrow fontSize='small' />
+        </Button>
+      );
+    case 'running':
+      return (
+        <Button
+          className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
+          onClick={stop}
+          title={statusText}
+          variant='outlined'
+        >
+          <Pause fontSize='small' />
+        </Button>
+      );
+    case 'loading':
+      return (
+        <Button
+          className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
+          onClick={stop}
+          title={statusText}
+          variant='outlined'
+        >
+          <Refresh className='animate-spin' fontSize='small' />
+        </Button>
+      );
+    case 'error':
+      return (
+        <Button
+          className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
+          color='error'
+          onClick={stop}
+          title={statusText}
+          variant='outlined'
+        >
+          <Error fontSize='small' />
+        </Button>
+      );
+    case 'unknown':
+      return (
+        <Button
+          className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
+          disabled
+          title={statusText}
+          variant='outlined'
+        >
+          <QuestionMark fontSize='small' />
+        </Button>
+      );
     }
   }, [run, status, statusText, stop]);
 

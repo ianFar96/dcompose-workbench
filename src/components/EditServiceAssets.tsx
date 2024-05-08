@@ -137,8 +137,7 @@ export default function EditServiceAssets(props: EditServiceAssetsProps) {
         if (error === 'entry_already_exists') {
           setDoesEntryExist(true);
         } else {
-          // TODO: un bell'allert
-          console.error(error);
+          alert(error);
         }
       });
   }, [loadAssets, props.sceneName, props.serviceId, selectedEntry, targetPath]);
