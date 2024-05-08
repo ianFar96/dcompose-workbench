@@ -1,3 +1,10 @@
 - Create new service
-- Create/delete/update new scene
-- Upload files to the service folder to be used as volumes
+- Hamburger menu for reload scene, open vscode, create service, import services (marketplace replacement)
+- Delete service
+- Rename scene
+- Scale service (?)
+- Loading logs / status
+- Search in logs
+- Git-ify the scenes
+- Delete volumes
+- Autocomplete in service edit

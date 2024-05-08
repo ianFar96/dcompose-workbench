@@ -24,8 +24,6 @@ use crate::{
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DockerComposeLabels {
-    #[serde(rename = "serviceName", skip_serializing_if = "Option::is_none")]
-    pub service_name: Option<String>,
     #[serde(rename = "serviceType", skip_serializing_if = "Option::is_none")]
     pub service_type: Option<String>,
 

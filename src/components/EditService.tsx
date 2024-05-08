@@ -1,89 +1,99 @@
 import { Editor } from '@monaco-editor/react';
-import { Alert, Snackbar } from '@mui/material';
+import { Button, TextField } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
-import { KeyCode, KeyMod, type editor } from 'monaco-editor';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import type { editor } from 'monaco-editor';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import YAML from 'yaml';
 
 import type { ServiceYaml } from '../types/service';
 
 type EditServiceProps = {
-  serviceId: string
+  serviceId?: string
   sceneName: string
+  serviceIds: string[]
+  handleSubmit: (serviceId: string, code: string) => void
+  handleCancel: () => void
+  submitText: string
 }
 
-// TODO: try adding validation with https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json
 export default function EditService(props: EditServiceProps) {
-  const [service, setService] = useState<ServiceYaml>();
-  const serviceYamlString = useMemo(() => (service ? YAML.stringify(service) : ''), [service]);
+  const [serviceYamlString, setServiceYamlString] = useState<string>();
 
   useEffect(() => {
-    invoke<ServiceYaml>('get_service', { sceneName: props.sceneName, serviceId: props.serviceId })
-      .then(service => {
-        setService(service);
-      })
-      .catch(error => {
-      // TODO: un bell'allert
-        console.error(error);
-      });
-  }, [props.sceneName, props.serviceId]);
-
-  const [isToastOpen, setIsToastOpen] = useState(false);
-
-  const onMount = useCallback((editor: editor.IStandaloneCodeEditor) => {
-    editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyS, () => {
-      const value = editor.getValue();
-
-      let parsedValue;
-      try {
-        parsedValue = YAML.parse(value) as ServiceYaml;
-      } catch (error) {
-        return;
-      }
-
-      invoke<ServiceYaml>('overwrite_service_config', { config: parsedValue, sceneName: props.sceneName, serviceId: props.serviceId })
-        .then(() => {
-          setIsToastOpen(true);
+    if (props.serviceId) {
+      invoke<ServiceYaml>('get_service', { sceneName: props.sceneName, serviceId: props.serviceId })
+        .then(service => {
+          setServiceYamlString(YAML.stringify(service));
         })
         .catch(error => {
           // TODO: un bell'allert
           console.error(error);
         });
-    });
+    }
   }, [props.sceneName, props.serviceId]);
 
-  const handleToastClose = useCallback(() => {
-    setIsToastOpen(false);
-  }, []);
+  const [isServiceIdTaken, setIsServiceIdTaken] = useState(false);
+
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const onMount = (editor: editor.IStandaloneCodeEditor) => {
+    editorRef.current = editor;
+  };
+
+  const onSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const formJson = Object.fromEntries(formData.entries());
+    const { serviceId } = formJson;
+    if (!serviceId) { return; }
+
+    const isServiceIdTaken = props.serviceIds.some(service => service === serviceId && service !== props.serviceId);
+    setIsServiceIdTaken(isServiceIdTaken);
+
+    if (!isServiceIdTaken) {
+      props.handleSubmit(serviceId as string, editorRef.current?.getValue() ?? '{}');
+    }
+  }, [props]);
+
+  const defaultServiceTemplate = useMemo(() => YAML.stringify({
+    image: 'mongo',
+    labels: {
+      serviceType: 'DB',
+    },
+    ports: ['27017:27017'],
+  }), []);
 
   return (
-    <>
-      {serviceYamlString ? (
-        <>
-          <Snackbar
-            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-            autoHideDuration={1000}
-            onClose={handleToastClose}
-            open={isToastOpen}
-          >
-            <Alert
-              severity='success'
-              sx={{ width: '100%' }}
-              variant='filled'
-            >
-              Saved
-            </Alert>
-          </Snackbar>
+    <form className='w-[50vw] h-full flex flex-col' onSubmit={onSubmit}>
+      <div className='px-4 py-3'>
+        <TextField
+          autoFocus
+          error={isServiceIdTaken}
+          fullWidth
+          helperText={`${isServiceIdTaken ? 'A service with that Id already exists' : 'Use only alphanumeric characters, `-`, `/`, `:` and `_`.'}`}
+          name='serviceId'
+          placeholder='Service Id'
+          size='small'
+          defaultValue={props.serviceId}
+          type='text'
+          variant='outlined'
+        />
+      </div>
 
-          <Editor
-            defaultLanguage='yaml'
-            defaultValue={serviceYamlString}
-            onMount={onMount}
-            options={{ scrollBeyondLastLine: false }}
-            theme='vs-dark'
-          />
-        </>
-      ) : undefined}
-    </>
+      {!props.serviceId || serviceYamlString ?
+        <Editor
+          className='h-full'
+          defaultLanguage='yaml'
+          defaultValue={serviceYamlString ?? defaultServiceTemplate}
+          onMount={onMount}
+          options={{ scrollBeyondLastLine: false }}
+          theme='vs-dark'
+        /> : undefined}
+
+
+      <div className='flex justify-end px-4 py-2'>
+        <Button className='mr-4' onClick={props.handleCancel}>Cancel</Button>
+        <Button type='submit' variant='contained'>{props.submitText}</Button>
+      </div>
+    </form>
   );
 }

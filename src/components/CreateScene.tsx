@@ -37,8 +37,8 @@ export default function CreateScene(props: CreateSceneDialogProps) {
       <DialogTitle>Create scene</DialogTitle>
       <DialogContent>
         <DialogContentText className='mb-4'>
-            Creating a scene creates a folder with the specified scene name
-            and an empty docker-compose.yml file to create your services
+          Creating a scene adds a folder with the specified scene name
+          and an empty docker-compose.yml file to create your services
         </DialogContentText>
         <TextField
           autoFocus

@@ -1,17 +1,19 @@
-import { ArrowBack, PlayArrow, Refresh, Stop } from '@mui/icons-material';
+import { ArrowBack, MoreVert, PlayArrow, Refresh, Stop } from '@mui/icons-material';
 import ReplayIcon from '@mui/icons-material/Replay';
 import { Button } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
 import dagre from 'dagre';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { Connection, Edge, Node } from 'reactflow';
 import { Background, ControlButton, Controls, MiniMap, Position, default as ReactFlow, addEdge, useEdgesState, useNodesState } from 'reactflow';
 
+import CreateServiceDrawer from '../components/CreateServiceDrawer';
 import type { CustomEdgeData } from '../components/CustomEdge';
 import CustomEdge from '../components/CustomEdge';
 import type { CustomNodeData } from '../components/CustomNode';
 import CustomNode from '../components/CustomNode';
+import SceneMenu from '../components/SceneMenu';
 import type { Service } from '../types/service';
 
 import '@fontsource/roboto/300.css';
@@ -68,9 +70,13 @@ export default function Scene() {
   const { sceneName } = useParams();
   if (!sceneName) { throw new Error(); }
 
+  const [services, setServices] = useState<Service[]>([]);
+
   const unlistenStatusFns: (() => Promise<unknown>)[] = useMemo(() => [], []);
   const loadScene = useCallback(() => {
     invoke<Service[]>('get_scene_services', { sceneName }).then(services => {
+      setServices(services);
+
       for (const service of services) {
         invoke('start_emitting_service_status', { sceneName, serviceId: service.id }).catch(error => {
           // TODO: un bell'alert
@@ -83,7 +89,6 @@ export default function Scene() {
         data: {
           sceneName,
           serviceId: service.id,
-          serviceName: service.label,
           serviceType: service.type,
         },
         id: service.id,
@@ -222,6 +227,20 @@ export default function Scene() {
     return () => { window.removeEventListener('keydown', callback); };
   }, [reloadScene]);
 
+  const [isMenuShown, setIsMenuShown] = useState(false);
+  const triggerMenuRef = useRef(null);
+
+  const [isCreateServiceDrawerOpen, setIsCreateDrawerDialogOpen] = useState(false);
+  const handleCreateService = useCallback((serviceId: string, code: string) => {
+    invoke('create_service', { code, sceneName, serviceId }).then(() => {
+      setIsCreateDrawerDialogOpen(false);
+      reloadScene();
+    }).catch(error => {
+      // TODO: un bell'allert
+      console.error(error);
+    });
+  }, [reloadScene, sceneName]);
+
   return (
     <>
       <div className='flex flex-col h-screen'>
@@ -235,22 +254,6 @@ export default function Scene() {
 
           <div>
             <Button
-              className='w-10 h-10 min-w-[unset] p-2 mr-2'
-              onClick={reloadScene}
-              title='Reload scene config'
-            >
-              <Refresh className='text-gray-500' fontSize='large' />
-            </Button>
-
-            <Button
-              className='w-10 h-10 min-w-[unset] p-2 mr-2'
-              onClick={openVsCode}
-              title='Open in VS Code'
-            >
-              <img alt='' src='/vscode.svg' />
-            </Button>
-
-            <Button
               className='w-10 h-10 min-w-[unset] p-0 mr-2'
               disabled={isRunningScene}
               onClick={startAll}
@@ -261,7 +264,7 @@ export default function Scene() {
             </Button>
 
             <Button
-              className='w-10 h-10 min-w-[unset] p-0'
+              className='w-10 h-10 min-w-[unset] p-0 mr-2'
               disabled={isStoppingScene}
               onClick={stopAll}
               title='Stop all services'
@@ -269,8 +272,38 @@ export default function Scene() {
             >
               {isStoppingScene ? <Refresh className='animate-spin' fontSize='large' /> : <Stop fontSize='large' />}
             </Button>
+
+            <button
+              className='w-4 h-10 min-w-[unset] p-0'
+              color='inherit'
+              onClick={() => setIsMenuShown(!isMenuShown)}
+              ref={triggerMenuRef}
+            >
+              <MoreVert />
+            </button>
           </div>
         </div>
+
+        {triggerMenuRef.current ? (
+          <SceneMenu
+            actions={{
+              createService: () => setIsCreateDrawerDialogOpen(true),
+              openVsCode,
+              reloadScene,
+            }}
+            anchorEl={triggerMenuRef.current}
+            handleClose={() => setIsMenuShown(false)}
+            open={isMenuShown}
+          />
+        ) : undefined}
+
+        <CreateServiceDrawer
+          handleClose={() => setIsCreateDrawerDialogOpen(false)}
+          handleSubmit={handleCreateService}
+          open={isCreateServiceDrawerOpen}
+          sceneName={sceneName}
+          serviceIds={services.map(service => service.id)}
+        />
 
         <div className='h-full w-screen'>
           <ReactFlow

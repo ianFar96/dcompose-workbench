@@ -30,7 +30,6 @@ impl From<DockerComposeDependsOn> for DependsOn {
 #[derive(Deserialize, Serialize)]
 pub struct Service {
     pub id: String,
-    pub label: String,
     #[serde(rename = "type")]
     pub type_name: Option<String>,
     #[serde(rename = "dependsOn")]
@@ -96,10 +95,6 @@ pub async fn get_scene_services(scene_name: &str) -> Result<Vec<Service>, String
     for (service_id, service) in docker_compose_file.services {
         services.push(Service {
             id: service_id.clone(),
-            label: match service.labels {
-                None => service_id.clone(),
-                Some(ref labels) => labels.service_name.clone().unwrap_or(service_id.clone()),
-            },
             type_name: match service.labels {
                 None => None,
                 Some(labels) => labels.service_type,
@@ -126,20 +121,48 @@ pub fn get_service(scene_name: &str, service_id: &str) -> Result<DockerComposeSe
 }
 
 #[tauri::command(async)]
-pub fn overwrite_service_config(
+pub fn create_service(scene_name: &str, service_id: &str, code: &str) -> Result<(), String> {
+    let mut docker_compose_file = docker::get_docker_compose_file(scene_name)?;
+    if docker_compose_file.services.contains_key(service_id) {
+        return Err(format!("Service with Id {service_id} already exists"));
+    }
+
+    let deserialized_code = serde_yaml::from_str(code)
+        .map_err(|err| format!("Invalid format for service {service_id} configuration: {err}"))?;
+    docker_compose_file
+        .services
+        .insert(service_id.to_string(), deserialized_code);
+
+    docker::write_docker_compose_file(scene_name, &docker_compose_file)
+}
+
+#[tauri::command(async)]
+pub fn update_service(
     scene_name: &str,
     service_id: &str,
-    config: DockerComposeService,
+    previous_service_id: &str,
+    code: &str,
 ) -> Result<(), String> {
     let mut docker_compose_file = docker::get_docker_compose_file(scene_name)?;
-    let result = docker_compose_file
+    let previous_service = docker_compose_file
         .services
-        .insert(service_id.to_string(), config);
-
-    match result {
-        None => Err(format!("Cannot find service {service_id}")),
-        Some(_) => docker::write_docker_compose_file(scene_name, &docker_compose_file),
+        .remove_entry(previous_service_id);
+    if previous_service.is_none() {
+        return Err(format!("Cannot find service with Id {service_id}"));
     }
+
+    let service_already_exists = docker_compose_file.services.contains_key(service_id);
+    if service_already_exists {
+        return Err(format!("Service with Id {service_id} already exists"));
+    }
+
+    let deserialized_code = serde_yaml::from_str(code)
+        .map_err(|err| format!("Invalid format for service {service_id} configuration: {err}"))?;
+
+    docker_compose_file
+        .services
+        .insert(service_id.to_string(), deserialized_code);
+    docker::write_docker_compose_file(scene_name, &docker_compose_file)
 }
 
 #[tauri::command(async)]
