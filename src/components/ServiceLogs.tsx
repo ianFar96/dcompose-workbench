@@ -1,5 +1,6 @@
 import { useDebouncedState } from '@mantine/hooks';
 import { invoke } from '@tauri-apps/api';
+import { message } from '@tauri-apps/api/dialog';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import useTauriEvent from '../hooks/useTauriEvent';
@@ -36,11 +37,11 @@ export default function ServiceLogs(props: ServiceLogsProps) {
 
   useEffect(() => {
     invoke('start_emitting_service_logs', { sceneName: props.sceneName, serviceId: props.serviceId })
-      .catch(error => alert(error));
+      .catch(error => message(error as string, { title: 'Error', type: 'error' }));
 
     return () => {
       invoke('stop_emitting_service_logs', { sceneName: props.sceneName, serviceId: props.serviceId })
-        .catch(error => alert(error));
+        .catch(error => message(error as string, { title: 'Error', type: 'error' }));
     };
   }, [props.sceneName, props.serviceId]);
 

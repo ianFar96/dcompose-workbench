@@ -2,6 +2,7 @@
 import { ArrowForward, Delete } from '@mui/icons-material';
 import { Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
+import { message } from '@tauri-apps/api/dialog';
 import { useConfirm } from 'material-ui-confirm';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -16,7 +17,7 @@ export default function Scenes() {
   const loadScenes = useCallback(() => {
     invoke<Scene[]>('get_scenes').then(scenes => {
       setScenes(scenes);
-    }).catch(error => alert(error));
+    }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
   }, []);
 
   useEffect(() => {
@@ -35,7 +36,7 @@ export default function Scenes() {
     }).then(() => {
       invoke('delete_scene', { sceneName }).then(() => {
         loadScenes();
-      }).catch(error => alert(error));
+      }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
     }).catch(() => {});
   }, [confirm, loadScenes]);
 
@@ -44,7 +45,7 @@ export default function Scenes() {
     invoke('create_scene', { sceneName }).then(() => {
       setIsCreateSceneDialogOpen(false);
       loadScenes();
-    }).catch(error => alert(error));
+    }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
   }, [loadScenes]);
 
   return (

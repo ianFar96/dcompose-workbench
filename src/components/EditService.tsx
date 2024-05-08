@@ -1,6 +1,7 @@
 import { Editor } from '@monaco-editor/react';
 import { Button, TextField } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
+import { message } from '@tauri-apps/api/dialog';
 import type { editor } from 'monaco-editor';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import YAML from 'yaml';
@@ -25,7 +26,7 @@ export default function EditService(props: EditServiceProps) {
         .then(service => {
           setServiceYamlString(YAML.stringify(service));
         })
-        .catch(error => alert(error));
+        .catch(error => message(error as string, { title: 'Error', type: 'error' }));
     }
   }, [props.sceneName, props.serviceId]);
 
@@ -76,7 +77,7 @@ export default function EditService(props: EditServiceProps) {
         />
       </div>
 
-      {!props.serviceId || serviceYamlString
+      {(!props.serviceId || serviceYamlString)
         ? <Editor
           className='h-full'
           defaultLanguage='yaml'

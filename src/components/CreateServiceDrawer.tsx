@@ -1,10 +1,12 @@
 import { Drawer } from '@mui/material';
-import React from 'react';
+import { invoke } from '@tauri-apps/api';
+import { message } from '@tauri-apps/api/dialog';
+import React, { useCallback } from 'react';
 
 import EditService from './EditService';
 
 type CreateServiceDrawerProps = {
-  handleSubmit: (serviceId: string, code: string) => void
+  onAfterCreateService: () => void
   handleClose: () => void
   sceneName: string
   serviceIds: string[]
@@ -12,6 +14,12 @@ type CreateServiceDrawerProps = {
 }
 
 export default function CreateServiceDrawer(props: CreateServiceDrawerProps) {
+  const handleCreateService = useCallback((serviceId: string, code: string) => {
+    invoke('create_service', { code, sceneName: props.sceneName, serviceId }).then(() => {
+      props.onAfterCreateService();
+    }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
+  }, [props]);
+
   return (
     <Drawer
       anchor='right'
@@ -27,7 +35,7 @@ export default function CreateServiceDrawer(props: CreateServiceDrawerProps) {
 
       <EditService
         handleCancel={props.handleClose}
-        handleSubmit={props.handleSubmit}
+        handleSubmit={handleCreateService}
         sceneName={props.sceneName}
         serviceIds={props.serviceIds}
         submitText='Create'

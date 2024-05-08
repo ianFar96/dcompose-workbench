@@ -1,6 +1,7 @@
 import { Error, Pause, PlayArrow, QuestionMark, Refresh } from '@mui/icons-material';
 import { Button, Card, CardContent, Chip, Drawer, Typography } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
+import { message } from '@tauri-apps/api/dialog';
 import React, { useCallback, useMemo, useState } from 'react';
 import type { NodeProps } from 'reactflow';
 import { Handle, Position } from 'reactflow';
@@ -14,6 +15,7 @@ export type CustomNodeData = {
   sceneName: string
   serviceId: string
   serviceType?: string
+  reloadScene: () => void
 }
 
 export default function CustomNode(props: NodeProps<CustomNodeData>) {
@@ -32,8 +34,8 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
     invoke('run_service', {
       sceneName: props.data.sceneName,
       serviceId: props.data.serviceId,
-    }).catch(error => alert(error));
-  }, [props.data.sceneName, props.data.serviceId]);
+    }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
+  }, [props.data]);
 
   const stop = useCallback(() => {
     setStatus('loading');
@@ -41,8 +43,12 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
     invoke('stop_service', {
       sceneName: props.data.sceneName,
       serviceId: props.data.serviceId,
-    }).catch(error => alert(error));
+    }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
   }, [props.data.sceneName, props.data.serviceId]);
+
+  const onAfterUpdateService = useCallback(() => {
+    props.data.reloadScene();
+  }, [props.data]);
 
   const actionButton = useMemo(() => {
     switch (status) {
@@ -128,6 +134,7 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
         open={isDrawerOpen}
       >
         <NodeDrawer
+          onAfterUpdateService={onAfterUpdateService}
           sceneName={props.data.sceneName}
           serviceId={props.data.serviceId}
         />

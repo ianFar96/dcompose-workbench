@@ -1,3 +1,4 @@
+import { message } from '@tauri-apps/api/dialog';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
 
@@ -9,7 +10,7 @@ export default function useTauriEvent<T>(eventName: string, callback: (payload: 
 
     let unlisten: UnlistenFn | undefined;
     unlistenPromise.then(unlistenFn => { unlisten = unlistenFn; })
-      .catch(error => alert(error));
+      .catch(error => message(error as string, { title: 'Error', type: 'error' }));
     return () => { unlisten?.(); };
   }, []);
 }

@@ -1,6 +1,7 @@
 import { ArrowBack, Edit, Folder, Search } from '@mui/icons-material';
 import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
+import { message } from '@tauri-apps/api/dialog';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Node } from 'reactflow';
 import { useReactFlow } from 'reactflow';
@@ -15,6 +16,7 @@ type Pages = undefined | 'logs' | 'edit' | 'assets'
 type NodeDrawerProps = {
   serviceId: string
   sceneName: string
+  onAfterUpdateService: () => void
 }
 
 export default function NodeDrawer(props: NodeDrawerProps) {
@@ -35,8 +37,9 @@ export default function NodeDrawer(props: NodeDrawerProps) {
       serviceId,
     }).then(() => {
       setPage(undefined);
-    }).catch(error => alert(error));
-  }, [props.sceneName, props.serviceId]);
+      props.onAfterUpdateService();
+    }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
+  }, [props]);
 
   return useMemo(() => {
     switch (page) {

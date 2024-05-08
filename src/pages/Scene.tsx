@@ -1,5 +1,6 @@
 import ReplayIcon from '@mui/icons-material/Replay';
 import { invoke } from '@tauri-apps/api';
+import { message } from '@tauri-apps/api/dialog';
 import dagre from 'dagre';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -73,12 +74,18 @@ export default function Scene() {
 
       for (const service of services) {
         invoke('start_emitting_service_status', { sceneName, serviceId: service.id })
-          .catch(error => alert(error));
+          .catch(error => message(error as string, { title: 'Error', type: 'error' }));
         unlistenStatusFns.push(invoke.bind(undefined, 'stop_emitting_service_status', { sceneName, serviceId: service.id }));
       }
 
       const sceneNodes: Node<CustomNodeData>[] = services.map(service => ({
         data: {
+          reloadScene: () => {
+            for (const unlisten of unlistenStatusFns) {
+              unlisten().catch(error => message(error as string, { title: 'Error', type: 'error' }));
+            }
+            loadScene();
+          },
           sceneName,
           serviceId: service.id,
           serviceType: service.type,
@@ -117,7 +124,7 @@ export default function Scene() {
     loadScene();
     return () => {
       for (const unlisten of unlistenStatusFns) {
-        unlisten().catch(error => alert(error));
+        unlisten().catch(error => message(error as string, { title: 'Error', type: 'error' }));
       }
     };
   }, [setNodes, setEdges, sceneName, loadScene, unlistenStatusFns]);
@@ -135,7 +142,7 @@ export default function Scene() {
           type: 'custom',
         }, edges));
       })
-      .catch(error => alert(error));
+      .catch(error => message(error as string, { title: 'Error', type: 'error' }));
   }, [sceneName, setEdges]);
 
   const onEdgesDelete = useCallback((edgesToDelete: Edge[]) => {
@@ -144,7 +151,7 @@ export default function Scene() {
         .then(() => {
           setEdges(edges => edges.filter(edge => !edgesToDelete.includes(edge)));
         })
-        .catch(error => alert(error));
+        .catch(error => message(error as string, { title: 'Error', type: 'error' }));
     }
   }, [sceneName, setEdges]);
 
@@ -156,7 +163,7 @@ export default function Scene() {
 
   const reloadScene = useCallback(() => {
     for (const unlisten of unlistenStatusFns) {
-      unlisten().catch(error => alert(error));
+      unlisten().catch(error => message(error as string, { title: 'Error', type: 'error' }));
     }
 
     loadScene();

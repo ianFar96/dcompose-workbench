@@ -2,6 +2,7 @@ import { Delete } from '@mui/icons-material';
 import type { SelectChangeEvent } from '@mui/material';
 import { Box, Button, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
+import { message } from '@tauri-apps/api/dialog';
 import React, { useCallback } from 'react';
 import { useReactFlow, type Edge } from 'reactflow';
 
@@ -20,7 +21,7 @@ export default function EdgeDrawer(props: EdgeDrawerProps) {
       sceneName: props.sceneName,
       source: props.edge.source,
       target: props.edge.target,
-    }).catch(error => alert(error));
+    }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
   }, [props.sceneName, props.edge.source, props.edge.target]);
 
   const { setEdges } = useReactFlow();
@@ -29,7 +30,7 @@ export default function EdgeDrawer(props: EdgeDrawerProps) {
       .then(() => {
         setEdges(edges => edges.filter(edge => edge.id !== props.edge.id));
       })
-      .catch(error => alert(error));
+      .catch(error => message(error as string, { title: 'Error', type: 'error' }));
   }, [props.edge, props.sceneName, setEdges]);
 
   return (

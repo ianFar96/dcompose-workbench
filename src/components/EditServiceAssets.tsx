@@ -4,7 +4,7 @@ import { DriveFolderUpload, Refresh, Upload, UploadFile } from '@mui/icons-mater
 import { Button, InputAdornment, TextField } from '@mui/material';
 import { SimpleTreeView, TreeItem } from '@mui/x-tree-view';
 import { invoke, path } from '@tauri-apps/api';
-import { open } from '@tauri-apps/api/dialog';
+import { message, open } from '@tauri-apps/api/dialog';
 import { appDataDir } from '@tauri-apps/api/path';
 import type { FormEvent } from 'react';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -65,7 +65,7 @@ export default function EditServiceAssets(props: EditServiceAssetsProps) {
       .then(assets => {
         setAssets(assets);
       })
-      .catch(error => alert(error));
+      .catch(error => message(error as string, { title: 'Error', type: 'error' }));
   }, [props.sceneName, props.serviceId]);
 
   useEffect(() => {
@@ -74,7 +74,7 @@ export default function EditServiceAssets(props: EditServiceAssetsProps) {
 
   const openVsCode = useCallback((filepath?: string) => {
     invoke('open_vscode', { filepath, sceneName: props.sceneName, serviceId: props.serviceId })
-      .catch(error => alert(error));
+      .catch(error => message(error as string, { title: 'Error', type: 'error' }));
   }, [props.sceneName, props.serviceId]);
 
   const [selectedEntry, setSelectedEntry] = useState<string|null>(null);
@@ -91,10 +91,10 @@ export default function EditServiceAssets(props: EditServiceAssetsProps) {
           setDoesEntryExist(false);
           path.basename(selected as string).then(basename => {
             setTargetPath(basename);
-          }).catch(error => alert(error));
+          }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
         }
-      }).catch(error => alert(error));
-    }).catch(error => alert(error));
+      }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
+    }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
   }, []);
 
   const onClickFolder = useCallback(() => {
@@ -108,7 +108,7 @@ export default function EditServiceAssets(props: EditServiceAssetsProps) {
           setDoesEntryExist(false);
           path.basename(selected as string).then(basename => {
             setTargetPath(basename);
-          }).catch(error => alert(error));
+          }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
         }
       }).catch(_ => {});
     }).catch(_ => {});
@@ -132,12 +132,12 @@ export default function EditServiceAssets(props: EditServiceAssetsProps) {
         setTargetPath('');
         loadAssets();
       })
-      .catch(error => {
+      .catch(async error => {
         setIsCopying(false);
         if (error === 'entry_already_exists') {
           setDoesEntryExist(true);
         } else {
-          alert(error);
+          await message(error as string, { title: 'Error', type: 'error' });
         }
       });
   }, [loadAssets, props.sceneName, props.serviceId, selectedEntry, targetPath]);

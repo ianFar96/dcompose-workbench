@@ -1,6 +1,7 @@
 import { ArrowBack, MoreVert, PlayArrow, Refresh, Stop } from '@mui/icons-material';
 import { Button } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
+import { message } from '@tauri-apps/api/dialog';
 import React, { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -20,7 +21,7 @@ export default function SceneHeader(props: SceneHeaderProps) {
   const startAll = useCallback(() => {
     setIsRunningScene(true);
     invoke('run_scene', { sceneName: props.sceneName })
-      .catch(error => alert(error))
+      .catch(error => message(error as string, { title: 'Error', type: 'error' }))
       .finally(() => {
         setIsRunningScene(false);
       });
@@ -30,7 +31,7 @@ export default function SceneHeader(props: SceneHeaderProps) {
   const stopAll = useCallback(() => {
     setIsStoppingScene(true);
     invoke('stop_scene', { sceneName: props.sceneName })
-      .catch(error => alert(error))
+      .catch(error => message(error as string, { title: 'Error', type: 'error' }))
       .finally(() => {
         setIsStoppingScene(false);
       });
@@ -38,18 +39,17 @@ export default function SceneHeader(props: SceneHeaderProps) {
 
   const openVsCode = useCallback(() => {
     invoke('open_vscode', { sceneName: props.sceneName })
-      .catch(error => alert(error));
+      .catch(error => message(error as string, { title: 'Error', type: 'error' }));
   }, [props.sceneName]);
 
   const [isMenuShown, setIsMenuShown] = useState(false);
   const triggerMenuRef = useRef(null);
 
   const [isCreateServiceDrawerOpen, setIsCreateDrawerDialogOpen] = useState(false);
-  const handleCreateService = useCallback((serviceId: string, code: string) => {
-    invoke('create_service', { code, sceneName: props.sceneName, serviceId }).then(() => {
-      setIsCreateDrawerDialogOpen(false);
-      props.reloadScene();
-    }).catch(error => alert(error));
+
+  const onAfterCreateService = useCallback(() => {
+    setIsCreateDrawerDialogOpen(false);
+    props.reloadScene();
   }, [props]);
 
   return (
@@ -109,7 +109,7 @@ export default function SceneHeader(props: SceneHeaderProps) {
 
       <CreateServiceDrawer
         handleClose={() => setIsCreateDrawerDialogOpen(false)}
-        handleSubmit={handleCreateService}
+        onAfterCreateService={onAfterCreateService}
         open={isCreateServiceDrawerOpen}
         sceneName={props.sceneName}
         serviceIds={props.serviceIds}
