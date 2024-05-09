@@ -48,6 +48,7 @@ export default function CreateScene(props: CreateSceneDialogProps) {
           label='Scene name'
           name='sceneName'
           required
+          size='small'
           type='text'
           variant='outlined'
         />

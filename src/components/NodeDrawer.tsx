@@ -1,5 +1,5 @@
 import { ArrowBack, Edit, Folder, Search } from '@mui/icons-material';
-import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
+import { Box, Button, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
 import { message } from '@tauri-apps/api/dialog';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -17,6 +17,7 @@ type NodeDrawerProps = {
   serviceId: string
   sceneName: string
   onAfterUpdateService: () => void
+  onDeleteService: (serviceId: string) => void
 }
 
 export default function NodeDrawer(props: NodeDrawerProps) {
@@ -29,7 +30,7 @@ export default function NodeDrawer(props: NodeDrawerProps) {
     setServiceIds(nodes.map(node => node.data.serviceId));
   }, [getNodes]);
 
-  const handleEditService = useCallback((serviceId: string, code: string) => {
+  const onEditService = useCallback((serviceId: string, code: string) => {
     invoke('update_service', {
       code,
       previousServiceId: props.serviceId,
@@ -77,7 +78,7 @@ export default function NodeDrawer(props: NodeDrawerProps) {
 
           <EditService
             handleCancel={() => setPage(undefined)}
-            handleSubmit={handleEditService}
+            handleSubmit={onEditService}
             sceneName={props.sceneName}
             serviceId={props.serviceId}
             serviceIds={serviceIds}
@@ -107,13 +108,13 @@ export default function NodeDrawer(props: NodeDrawerProps) {
     case undefined:
     default:
       return (
-        <Box className='min-w-72' role='presentation'>
+        <Box className='min-w-72 flex flex-col h-full' role='presentation'>
           <div className='px-6 py-4'>
             <h2 className='text-lg whitespace-nowrap'>{props.serviceId}</h2>
           </div>
           <hr />
 
-          <List>
+          <List className='h-full'>
             <ListItem disablePadding>
               <ListItemButton onClick={() => setPage('logs')}>
                 <ListItemIcon>
@@ -139,8 +140,15 @@ export default function NodeDrawer(props: NodeDrawerProps) {
               </ListItemButton>
             </ListItem>
           </List>
+
+          <hr />
+          <div className='flex justify-end px-4 py-3'>
+            <Button color='error' onClick={() => props.onDeleteService(props.serviceId)} variant='contained'>
+              Delete
+            </Button>
+          </div>
         </Box>
       );
     }
-  }, [handleEditService, page, props.sceneName, props.serviceId, serviceIds]);
+  }, [onEditService, page, props, serviceIds]);
 }

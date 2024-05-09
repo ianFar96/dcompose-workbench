@@ -1,5 +1,4 @@
-- Create new service
-- Hamburger menu for reload scene, open vscode, create service, import services (marketplace replacement)
+- import services (marketplace replacement) by ref or copy
 - Delete service
 - Rename scene
 - Scale service (?)

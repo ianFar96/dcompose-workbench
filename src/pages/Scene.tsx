@@ -1,10 +1,14 @@
+/* eslint-disable @typescript-eslint/no-use-before-define */
+/* eslint-disable no-case-declarations */
+/* eslint-disable no-empty-function */
 import ReplayIcon from '@mui/icons-material/Replay';
 import { invoke } from '@tauri-apps/api';
 import { message } from '@tauri-apps/api/dialog';
 import dagre from 'dagre';
+import { useConfirm } from 'material-ui-confirm';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { Connection, Edge, Node } from 'reactflow';
+import type { Connection, Edge, Node, NodeChange } from 'reactflow';
 import { Background, ControlButton, Controls, MiniMap, Position, default as ReactFlow, addEdge, useEdgesState, useNodesState } from 'reactflow';
 
 import type { CustomEdgeData } from '../components/CustomEdge';
@@ -60,8 +64,8 @@ export default function Scene() {
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
   const edgeTypes = useMemo(() => ({ custom: CustomEdge }), []);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<CustomNodeData>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<CustomEdgeData>([]);
 
   const { sceneName } = useParams();
   if (!sceneName) { throw new Error(); }
@@ -80,12 +84,8 @@ export default function Scene() {
 
       const sceneNodes: Node<CustomNodeData>[] = services.map(service => ({
         data: {
-          reloadScene: () => {
-            for (const unlisten of unlistenStatusFns) {
-              unlisten().catch(error => message(error as string, { title: 'Error', type: 'error' }));
-            }
-            loadScene();
-          },
+          onDeleteService,
+          reloadScene,
           sceneName,
           serviceId: service.id,
           serviceType: service.type,
@@ -118,6 +118,7 @@ export default function Scene() {
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
     }).catch(console.error);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sceneName, setEdges, setNodes, unlistenStatusFns]);
 
   useEffect(() => {
@@ -179,6 +180,38 @@ export default function Scene() {
     return () => { window.removeEventListener('keydown', callback); };
   }, [reloadScene]);
 
+  const confirm = useConfirm();
+  const onDeleteService = useCallback((serviceId: string) => {
+    confirm({
+      cancellationButtonProps: { variant: 'text' },
+      cancellationText: 'No',
+      confirmationButtonProps: { color: 'error', variant: 'contained' },
+      confirmationText: 'Yes',
+      description: `The service "${serviceId}" will be deleted along with its configuration and local assets. Are you sure you want to proceed?`,
+      title: 'Delete service',
+    }).then(() => {
+      invoke('delete_service', { sceneName, serviceId })
+        .then(() => reloadScene())
+        .catch(error => message(error as string, { title: 'Error', type: 'error' }));
+    }).catch(() => {});
+  }, [confirm, reloadScene, sceneName]);
+
+  const onCustomNodesChanges = useCallback((changes: NodeChange[]) => {
+    for (const change of changes) {
+      switch (change.type) {
+      case 'remove':
+        const node = nodes.find(node => node.id === change.id);
+        if (!node) { return; }
+        onDeleteService(node.data.serviceId);
+        break;
+
+      default:
+        onNodesChange([change]);
+        break;
+      }
+    }
+  }, [nodes, onDeleteService, onNodesChange]);
+
   return (
     <>
       <div className='flex flex-col h-screen'>
@@ -198,7 +231,7 @@ export default function Scene() {
             onConnect={onConnect}
             onEdgesChange={onEdgesChange}
             onEdgesDelete={onEdgesDelete}
-            onNodesChange={onNodesChange}
+            onNodesChange={onCustomNodesChanges}
           >
             <Background />
             <MiniMap />

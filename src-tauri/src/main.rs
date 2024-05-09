@@ -14,6 +14,7 @@ async fn main() {
             commands::get_scene_services,
             commands::get_service,
             commands::create_service,
+            commands::delete_service,
             commands::get_service_assets,
             commands::update_service,
             commands::start_emitting_service_status,

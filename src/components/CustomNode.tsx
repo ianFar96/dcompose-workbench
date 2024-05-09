@@ -16,6 +16,7 @@ export type CustomNodeData = {
   serviceId: string
   serviceType?: string
   reloadScene: () => void
+  onDeleteService: (serviceId: string) => void
 }
 
 export default function CustomNode(props: NodeProps<CustomNodeData>) {
@@ -135,6 +136,7 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
       >
         <NodeDrawer
           onAfterUpdateService={onAfterUpdateService}
+          onDeleteService={props.data.onDeleteService}
           sceneName={props.data.sceneName}
           serviceId={props.data.serviceId}
         />

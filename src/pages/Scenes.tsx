@@ -26,13 +26,14 @@ export default function Scenes() {
 
   const confirm = useConfirm();
 
-  const confirmDelete = useCallback((sceneName: string) => {
+  const deleteScene = useCallback((sceneName: string) => {
     confirm({
       cancellationButtonProps: { variant: 'text' },
+      cancellationText: 'No',
       confirmationButtonProps: { color: 'error', variant: 'contained' },
-      confirmationText: 'Delete',
+      confirmationText: 'Yes',
       description: 'This scene will be deleted and all configurations will be lost. Are you sure you want to proceed?',
-      title: 'Delete Scene',
+      title: 'Delete scene',
     }).then(() => {
       invoke('delete_scene', { sceneName }).then(() => {
         loadScenes();
@@ -78,7 +79,7 @@ export default function Scenes() {
                   </TableCell>
                   <TableCell align='right'>
                     <div className='flex'>
-                      <button className='p-0 mr-1 text-error' onClick={() => confirmDelete(scene.name)}>
+                      <button className='p-0 mr-1 text-error' onClick={() => deleteScene(scene.name)}>
                         <Delete />
                       </button>
                       <button className='p-0' onClick={() => navigate(`/scenes/${scene.name}`)}>
