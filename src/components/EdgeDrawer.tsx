@@ -1,4 +1,3 @@
-import { Delete } from '@mui/icons-material';
 import type { SelectChangeEvent } from '@mui/material';
 import { Box, Button, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
@@ -35,18 +34,8 @@ export default function EdgeDrawer(props: EdgeDrawerProps) {
 
   return (
     <>
-      <Box className='min-w-52 flex flex-col h-full' role='presentation'>
-        <div className='flex justify-between px-6 py-4'>
-          <h2 className='text-lg'>Dependency</h2>
-          <Button
-            className='w-6 h-6 min-w-[unset] p-0'
-            color='error'
-            onClick={onDelete}
-            variant='outlined'
-          >
-            <Delete fontSize='small' />
-          </Button>
-        </div>
+      <Box className='min-w-80 flex flex-col h-full' role='presentation'>
+        <h2 className='text-lg px-6 py-4'>Dependency</h2>
         <hr />
 
         <div className='px-4 py-3 h-full'>
@@ -74,6 +63,13 @@ export default function EdgeDrawer(props: EdgeDrawerProps) {
               ))}
             </Select>
           </FormControl>
+        </div>
+
+        <hr />
+        <div className='flex justify-end px-4 py-3'>
+          <Button color='error' onClick={onDelete} variant='contained'>
+              Delete
+          </Button>
         </div>
       </Box>
     </>

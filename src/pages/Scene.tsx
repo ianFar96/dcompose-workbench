@@ -137,6 +137,7 @@ export default function Scene() {
       .then(() => {
         setEdges((edges) => addEdge({
           ...connection,
+          animated: true,
           data: {
             sceneName,
             sourceServiceId: connection.source,

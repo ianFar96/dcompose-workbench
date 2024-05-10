@@ -1,10 +1,8 @@
 - import services (marketplace replacement) by ref or copy
 - Rename scene
 - Scale service (?)
-- Loading logs / status
+- Better display of ongoing `docker compose up`
 - Search in logs
 - Git-ify the scenes
 - Delete volumes
 - Autocomplete in service edit
-- Cannot handle more than 8 services (number of cores and listeners for status update)
-- Spawn only one thread per scene, no per service (service listening status)
