@@ -71,16 +71,9 @@ export default function Scene() {
   if (!sceneName) { throw new Error(); }
 
   const [serviceIds, setServiceIds] = useState<string[]>([]);
-  const unlistenStatusFns: (() => Promise<unknown>)[] = useMemo(() => [], []);
-  const loadScene = useCallback(() => {
-    invoke<Service[]>('get_scene_services', { sceneName }).then(services => {
+  const loadScene = useCallback(() => invoke<Service[]>('get_scene_services', { sceneName })
+    .then(services => {
       setServiceIds(services.map(service => service.id));
-
-      for (const service of services) {
-        invoke('start_emitting_service_status', { sceneName, serviceId: service.id })
-          .catch(error => message(error as string, { title: 'Error', type: 'error' }));
-        unlistenStatusFns.push(invoke.bind(undefined, 'stop_emitting_service_status', { sceneName, serviceId: service.id }));
-      }
 
       const sceneNodes: Node<CustomNodeData>[] = services.map(service => ({
         data: {
@@ -99,6 +92,7 @@ export default function Scene() {
       for (const service of services) {
         for (const [targetServiceId, definition] of Object.entries(service.dependsOn)) {
           sceneEdges.push({
+            animated: true,
             data: {
               condition: definition.condition,
               sceneName,
@@ -117,18 +111,26 @@ export default function Scene() {
 
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
-    }).catch(console.error);
+    }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sceneName, setEdges, setNodes, unlistenStatusFns]);
+  [sceneName, setEdges, setNodes]);
+
+  const startEmittingSceneStatus = useCallback(() => invoke('start_emitting_scene_status', { sceneName }), [sceneName]);
+  const stopEmittingSceneStatus = useCallback(() => invoke('stop_emitting_scene_status', { sceneName }), [sceneName]);
 
   useEffect(() => {
-    loadScene();
+    loadScene()
+      .then(() => {
+        startEmittingSceneStatus()
+          .catch(error => message(error as string, { title: 'Error', type: 'error' }));
+      })
+      .catch(error => message(error as string, { title: 'Error', type: 'error' }));
+
     return () => {
-      for (const unlisten of unlistenStatusFns) {
-        unlisten().catch(error => message(error as string, { title: 'Error', type: 'error' }));
-      }
+      stopEmittingSceneStatus()
+        .catch(error => message(error as string, { title: 'Error', type: 'error' }));
     };
-  }, [setNodes, setEdges, sceneName, loadScene, unlistenStatusFns]);
+  }, [loadScene, startEmittingSceneStatus, stopEmittingSceneStatus]);
 
   const onConnect = useCallback((connection: Connection) => {
     invoke('create_dependency', { sceneName, source: connection.source, target: connection.target })
@@ -163,12 +165,17 @@ export default function Scene() {
   }, [nodes, edges, setNodes, setEdges]);
 
   const reloadScene = useCallback(() => {
-    for (const unlisten of unlistenStatusFns) {
-      unlisten().catch(error => message(error as string, { title: 'Error', type: 'error' }));
-    }
-
-    loadScene();
-  }, [loadScene, unlistenStatusFns]);
+    stopEmittingSceneStatus()
+      .then(() => {
+        loadScene()
+          .then(() => {
+            startEmittingSceneStatus()
+              .catch(error => message(error as string, { title: 'Error', type: 'error' }));
+          })
+          .catch(error => message(error as string, { title: 'Error', type: 'error' }));
+      })
+      .catch(error => message(error as string, { title: 'Error', type: 'error' }));
+  }, [loadScene, startEmittingSceneStatus, stopEmittingSceneStatus]);
 
   useEffect(() => {
     const callback = (event: KeyboardEvent) => {

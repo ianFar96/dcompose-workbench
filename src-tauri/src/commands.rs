@@ -195,21 +195,16 @@ pub fn delete_service(scene_name: &str, service_id: &str) -> Result<(), String> 
 }
 
 #[tauri::command(async)]
-pub async fn start_emitting_service_status(
-    app: AppHandle,
-    scene_name: &str,
-    service_id: &str,
-) -> Result<(), String> {
-    docker::start_emitting_service_status(&app, scene_name, service_id).await
+pub async fn start_emitting_scene_status(app: AppHandle, scene_name: &str) -> Result<(), String> {
+    docker::start_emitting_scene_status(&app, scene_name).await
 }
 
 #[tauri::command(async)]
-pub async fn stop_emitting_service_status(
+pub async fn stop_emitting_scene_status(
     state: State<'_, AppState>,
     scene_name: &str,
-    service_id: &str,
 ) -> Result<(), String> {
-    docker::stop_emitting_service_status(state, scene_name, service_id).await
+    docker::stop_emitting_scene_status(state, scene_name).await
 }
 
 #[tauri::command(async)]

@@ -10,7 +10,7 @@ pub struct ServiceKey {
 
 pub struct AppState {
     pub service_log_handles: Arc<Mutex<HashMap<ServiceKey, JoinHandle<()>>>>,
-    pub service_status_handles: Arc<Mutex<HashMap<ServiceKey, JoinHandle<()>>>>,
+    pub service_status_handles: Arc<Mutex<HashMap<String, Vec<JoinHandle<()>>>>>,
 }
 
 impl Default for AppState {

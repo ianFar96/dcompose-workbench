@@ -1,5 +1,4 @@
 - import services (marketplace replacement) by ref or copy
-- Delete service
 - Rename scene
 - Scale service (?)
 - Loading logs / status
@@ -7,3 +6,5 @@
 - Git-ify the scenes
 - Delete volumes
 - Autocomplete in service edit
+- Cannot handle more than 8 services (number of cores and listeners for status update)
+- Spawn only one thread per scene, no per service (service listening status)

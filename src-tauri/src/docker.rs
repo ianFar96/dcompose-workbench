@@ -410,96 +410,104 @@ struct ServiceStatusEventPayload {
     message: Option<String>,
 }
 
-pub async fn start_emitting_service_status(
-    app: &AppHandle,
-    scene_name: &str,
-    service_id: &str,
-) -> Result<(), String> {
+pub async fn start_emitting_scene_status(app: &AppHandle, scene_name: &str) -> Result<(), String> {
     let docker = Docker::connect_with_socket_defaults()
         .map_err(|error| format!("Cannot connect to docker socket: {}", error))?;
+    let service_ids: Vec<String> = get_docker_compose_file(scene_name)?
+        .services
+        .into_keys()
+        .collect();
 
-    let thread_app = app.to_owned();
-    let thread_scene_name = scene_name.to_string();
-    let thread_service_id = service_id.to_string();
+    let mut status_handles = Vec::with_capacity(service_ids.len());
+    for service_id in service_ids {
+        let thread_app = app.to_owned();
+        let thread_scene_name = scene_name.to_string();
+        let thread_docker = docker.clone();
 
-    let status_handle = spawn(async move {
-        let service_status_event_name =
-            &format!("{thread_scene_name}-{thread_service_id}-status-event");
+        let status_handle = spawn(async move {
+            loop {
+                let service_status_event_name =
+                    &format!("{thread_scene_name}-{service_id}-status-event");
 
-        loop {
-            let container_name = loop {
-                match get_container_names_from_services(&thread_scene_name) {
-                    Err(err) => {
-                        thread_app
-                            .emit_all(
-                                service_status_event_name.as_ref(),
-                                ServiceLogEventPayload {
-                                    text: format!("Error getting containers: {}", err),
-                                    timestamp: get_formatted_date(None),
-                                    clear: true,
-                                    type_name: LogType::StdErr,
-                                },
-                            )
-                            .unwrap();
-                    }
-                    Ok(service_name_map) => {
-                        let container_name = service_name_map.get(&thread_service_id);
-
-                        match container_name {
-                            Some(container_name) => break container_name.to_string(),
-                            None => {
-                                thread_app
-                                    .emit_all(
-                                        service_status_event_name,
-                                        ServiceStatusEventPayload {
-                                            status: ServiceStatus::Paused,
-                                            message: Some(
-                                                "Status: unexisting container".to_string(),
-                                            ),
-                                        },
-                                    )
-                                    .unwrap();
-                            }
+                let container_name = loop {
+                    match get_container_names_from_services(&thread_scene_name) {
+                        Err(err) => {
+                            thread_app
+                                .emit_all(
+                                    service_status_event_name.as_ref(),
+                                    ServiceLogEventPayload {
+                                        text: format!("Error getting containers: {}", err),
+                                        timestamp: get_formatted_date(None),
+                                        clear: true,
+                                        type_name: LogType::StdErr,
+                                    },
+                                )
+                                .unwrap();
                         }
+                        Ok(service_name_map) => {
+                            let container_name = service_name_map.get(&service_id);
 
-                        sleep(Duration::from_secs(1)).await;
-                    }
-                }
-            };
-
-            let inspect_result = docker
-                .inspect_container(
-                    container_name.as_ref(),
-                    Some(InspectContainerOptions { size: false }),
-                )
-                .await;
-
-            match inspect_result {
-                Ok(container) => match &container.state {
-                    Some(state) => match &state.health {
-                        Some(health) => match health.status {
-                            Some(status) => match status {
-                                HealthStatusEnum::EMPTY | HealthStatusEnum::NONE => {
-                                    emit_service_status_by_status(
-                                        &thread_app,
-                                        state,
-                                        service_status_event_name,
-                                    )
-                                }
-                                status => {
+                            match container_name {
+                                Some(container_name) => break container_name.to_string(),
+                                None => {
                                     thread_app
                                         .emit_all(
                                             service_status_event_name,
                                             ServiceStatusEventPayload {
-                                                status: get_service_status_from_health_status(
-                                                    status,
-                                                )
-                                                .unwrap(),
-                                                message: Some(format!("Status: {}", status)),
+                                                status: ServiceStatus::Paused,
+                                                message: Some(
+                                                    "Status: unexisting container".to_string(),
+                                                ),
                                             },
                                         )
                                         .unwrap();
                                 }
+                            }
+
+                            sleep(Duration::from_secs(1)).await;
+                        }
+                    }
+                };
+
+                let inspect_result = thread_docker
+                    .inspect_container(
+                        container_name.as_ref(),
+                        Some(InspectContainerOptions { size: false }),
+                    )
+                    .await;
+
+                match inspect_result {
+                    Ok(container) => match &container.state {
+                        Some(state) => match &state.health {
+                            Some(health) => match health.status {
+                                Some(status) => match status {
+                                    HealthStatusEnum::EMPTY | HealthStatusEnum::NONE => {
+                                        emit_service_status_by_status(
+                                            &thread_app,
+                                            state,
+                                            service_status_event_name,
+                                        )
+                                    }
+                                    status => {
+                                        thread_app
+                                            .emit_all(
+                                                service_status_event_name,
+                                                ServiceStatusEventPayload {
+                                                    status: get_service_status_from_health_status(
+                                                        status,
+                                                    )
+                                                    .unwrap(),
+                                                    message: Some(format!("Status: {}", status)),
+                                                },
+                                            )
+                                            .unwrap();
+                                    }
+                                },
+                                None => emit_service_status_by_status(
+                                    &thread_app,
+                                    state,
+                                    service_status_event_name,
+                                ),
                             },
                             None => emit_service_status_by_status(
                                 &thread_app,
@@ -507,52 +515,47 @@ pub async fn start_emitting_service_status(
                                 service_status_event_name,
                             ),
                         },
-                        None => emit_service_status_by_status(
-                            &thread_app,
-                            state,
-                            service_status_event_name,
-                        ),
+                        None => {
+                            thread_app
+                                .emit_all(
+                                    service_status_event_name,
+                                    ServiceStatusEventPayload {
+                                        status: ServiceStatus::Paused,
+                                        message: None,
+                                    },
+                                )
+                                .unwrap();
+                        }
                     },
-                    None => {
+                    Err(error) => {
                         thread_app
                             .emit_all(
                                 service_status_event_name,
                                 ServiceStatusEventPayload {
-                                    status: ServiceStatus::Paused,
-                                    message: None,
+                                    status: ServiceStatus::Error,
+                                    message: Some(format!(
+                                        "Error while retrieving service status: {}",
+                                        error
+                                    )),
                                 },
                             )
                             .unwrap();
                     }
-                },
-                Err(error) => {
-                    thread_app
-                        .emit_all(
-                            service_status_event_name,
-                            ServiceStatusEventPayload {
-                                status: ServiceStatus::Error,
-                                message: Some(format!(
-                                    "Error while retrieving service status: {}",
-                                    error
-                                )),
-                            },
-                        )
-                        .unwrap();
                 }
-            }
 
-            sleep(Duration::from_secs(1)).await;
-        }
-    });
+                sleep(Duration::from_secs(3)).await;
+            }
+        });
+
+        status_handles.push(status_handle);
+    }
 
     let state = app.state::<AppState>();
-    state.service_status_handles.lock().await.insert(
-        ServiceKey {
-            scene_name: scene_name.to_string(),
-            service_id: service_id.to_string(),
-        },
-        status_handle,
-    );
+    state
+        .service_status_handles
+        .lock()
+        .await
+        .insert(scene_name.to_string(), status_handles);
 
     Ok(())
 }
@@ -626,27 +629,20 @@ fn get_service_status_from_health_status(health_status: HealthStatusEnum) -> Opt
     }
 }
 
-pub async fn stop_emitting_service_status(
+pub async fn stop_emitting_scene_status(
     state: State<'_, AppState>,
     scene_name: &str,
-    service_id: &str,
 ) -> Result<(), String> {
     let service_status_handles = state.service_status_handles.lock().await;
-    let status_handle = service_status_handles.get(&ServiceKey {
-        scene_name: scene_name.to_string(),
-        service_id: service_id.to_string(),
-    });
+    let status_handles = service_status_handles.get(scene_name);
 
-    match status_handle {
-        Some(status_handle) => {
+    if let Some(status_handles) = status_handles {
+        for status_handle in status_handles {
             status_handle.abort();
-            Ok(())
         }
-        None => Err(format!(
-            "Could not find the status emitting process for scene {} and service {}",
-            scene_name, service_id
-        )),
     }
+
+    Ok(())
 }
 
 pub fn add_dependency(scene_name: &str, service_id: &str, depends_on: &str) -> Result<(), String> {
