@@ -11,6 +11,7 @@ export type Service = {
   label: string
   type?: string
   dependsOn: Record<string, ServiceDependency>
+  sceneName: string
 }
 
 export type ServiceYaml = Record<string, unknown>

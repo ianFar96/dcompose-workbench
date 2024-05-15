@@ -15,6 +15,7 @@ export type CustomNodeData = {
   sceneName: string
   serviceId: string
   serviceType?: string
+  serviceSceneName: string
   reloadScene: () => void
   onDeleteService: (serviceId: string) => void
 }
@@ -47,9 +48,8 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
     }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
   }, [props.data.sceneName, props.data.serviceId]);
 
-  const onAfterUpdateService = useCallback(() => {
-    props.data.reloadScene();
-  }, [props.data]);
+  const isExternal = useMemo(() => props.data.sceneName !== props.data.serviceSceneName,
+    [props.data.sceneName, props.data.serviceSceneName]);
 
   const actionButton = useMemo(() => {
     switch (status) {
@@ -57,6 +57,7 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
       return (
         <Button
           className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
+          color={isExternal ? 'secondary' : 'primary'}
           onClick={run}
           title={statusText}
           variant='outlined'
@@ -68,6 +69,7 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
       return (
         <Button
           className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
+          color={isExternal ? 'secondary' : 'primary'}
           onClick={stop}
           title={statusText}
           variant='outlined'
@@ -79,6 +81,7 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
       return (
         <Button
           className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
+          color={isExternal ? 'secondary' : 'primary'}
           onClick={stop}
           title={statusText}
           variant='outlined'
@@ -102,6 +105,7 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
       return (
         <Button
           className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
+          color={isExternal ? 'secondary' : 'primary'}
           disabled
           title={statusText}
           variant='outlined'
@@ -110,7 +114,7 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
         </Button>
       );
     }
-  }, [run, status, statusText, stop]);
+  }, [isExternal, run, status, statusText, stop]);
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -124,7 +128,14 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
             {props.data.serviceId}
           </Typography>
           {props.data.serviceType
-            ? <Chip className='absolute bottom-2 left-3' color='primary' label={props.data.serviceType} size='small' variant='outlined' />
+            ? <Chip
+              className='absolute bottom-2 left-3'
+              color={isExternal ? 'secondary' : 'primary'}
+              label={props.data.serviceType}
+              size='small'
+              title={isExternal ? 'External' : ''}
+              variant='outlined'
+            />
             : undefined}
         </CardContent>
       </Card>
@@ -134,16 +145,11 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
         onClose={() => setIsDrawerOpen(false)}
         open={isDrawerOpen}
       >
-        <NodeDrawer
-          onAfterUpdateService={onAfterUpdateService}
-          onDeleteService={props.data.onDeleteService}
-          sceneName={props.data.sceneName}
-          serviceId={props.data.serviceId}
-        />
+        <NodeDrawer {...props} />
       </Drawer>
 
-      <Handle position={Position.Left} type='target' />
-      <Handle position={Position.Right} type='source' />
+      <Handle isConnectable={!isExternal} position={Position.Left} type='target' />
+      <Handle isConnectable={!isExternal} position={Position.Right} type='source' />
     </>
   );
 }

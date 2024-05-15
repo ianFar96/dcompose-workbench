@@ -5,6 +5,7 @@ use bollard::{
 };
 use chrono::DateTime;
 use futures::StreamExt;
+use path_absolutize::Absolutize;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::{
@@ -15,7 +16,7 @@ use std::{
     time::Duration,
 };
 use tauri::{AppHandle, Manager, State};
-use tokio::{spawn, time::sleep};
+use tokio::{spawn, task::JoinHandle, time::sleep};
 
 use crate::{
     state::{AppState, ServiceKey},
@@ -69,9 +70,35 @@ fn is_none_or_empty(depends_on: &Option<HashMap<String, DockerComposeDependsOn>>
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DockerComposeFile {
     pub services: HashMap<String, DockerComposeService>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include: Option<Vec<DockerComposeIncludeEnum>>,
 
     #[serde(flatten)]
     extra: HashMap<String, Value>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum DockerComposeIncludeEnum {
+    String(String),
+    Object(DockerComposeIncludeObject),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DockerComposeIncludeObject {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<DockerComposeIncludeStringOrList>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub env_file: Option<DockerComposeIncludeStringOrList>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_directory: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum DockerComposeIncludeStringOrList {
+    String(String),
+    List(Vec<String>),
 }
 
 fn get_docker_compose_dirpath(scene_name: &str) -> PathBuf {
@@ -413,21 +440,86 @@ struct ServiceStatusEventPayload {
 pub async fn start_emitting_scene_status(app: &AppHandle, scene_name: &str) -> Result<(), String> {
     let docker = Docker::connect_with_socket_defaults()
         .map_err(|error| format!("Cannot connect to docker socket: {}", error))?;
-    let service_ids: Vec<String> = get_docker_compose_file(scene_name)?
-        .services
-        .into_keys()
-        .collect();
 
+    let service_ids: Vec<String> = get_scene_service_ids(scene_name)?;
+
+    let service_status_handles =
+        emit_services_status(app, scene_name, &docker, &service_ids);
+
+    let state = app.state::<AppState>();
+    state.service_status_handles.lock().await.insert(
+        scene_name.to_string(),
+        service_status_handles,
+    );
+
+    Ok(())
+}
+
+fn get_scene_service_ids(scene_name: &str) -> Result<Vec<String>, String> {
+    let docker_compose_file = get_docker_compose_file(scene_name)?;
+    let mut service_ids: Vec<String> = vec![];
+    for (service_id, _) in docker_compose_file.services {
+        service_ids.push(service_id);
+    }
+
+    if let Some(include) = docker_compose_file.include {
+        for include_item in include {
+            let path = match include_item {
+                DockerComposeIncludeEnum::String(path) => Some(path),
+                DockerComposeIncludeEnum::Object(obj) => match obj.path {
+                    Some(DockerComposeIncludeStringOrList::String(path)) => Some(path),
+                    Some(DockerComposeIncludeStringOrList::List(paths)) => {
+                        paths.first().map(|path| path.to_string())
+                    }
+                    None => None,
+                },
+            };
+
+            if let Some(path) = path {
+                let include_filepath = get_config_dirpath()
+                    .join("scenes")
+                    .join(scene_name)
+                    .join(path.clone());
+                let include_filepath = include_filepath
+                    .absolutize()
+                    .map_err(|err| format!("Unable to resolve local path for ${path}: {err}"))?;
+
+                let scene_name = include_filepath
+                    .parent()
+                    .unwrap()
+                    .iter()
+                    .last()
+                    .unwrap()
+                    .to_str()
+                    .unwrap();
+
+                let external_services = get_scene_service_ids(scene_name)?;
+                service_ids = service_ids.into_iter().chain(external_services.into_iter()).collect();
+            }
+        }
+    }
+
+    Ok(service_ids)
+}
+
+fn emit_services_status(
+    app: &AppHandle,
+    scene_name: &str,
+    docker: &Docker,
+    service_ids: &Vec<String>
+) -> Vec<JoinHandle<()>> {
     let mut status_handles = Vec::with_capacity(service_ids.len());
+
     for service_id in service_ids {
         let thread_app = app.to_owned();
         let thread_scene_name = scene_name.to_string();
         let thread_docker = docker.clone();
+        let thread_service_id = service_id.to_string();
 
         let status_handle = spawn(async move {
             loop {
                 let service_status_event_name =
-                    &format!("{thread_scene_name}-{service_id}-status-event");
+                    &format!("{thread_scene_name}-{thread_service_id}-status-event");
 
                 let container_name = loop {
                     match get_container_names_from_services(&thread_scene_name) {
@@ -445,7 +537,7 @@ pub async fn start_emitting_scene_status(app: &AppHandle, scene_name: &str) -> R
                                 .unwrap();
                         }
                         Ok(service_name_map) => {
-                            let container_name = service_name_map.get(&service_id);
+                            let container_name = service_name_map.get(&thread_service_id);
 
                             match container_name {
                                 Some(container_name) => break container_name.to_string(),
@@ -550,14 +642,7 @@ pub async fn start_emitting_scene_status(app: &AppHandle, scene_name: &str) -> R
         status_handles.push(status_handle);
     }
 
-    let state = app.state::<AppState>();
-    state
-        .service_status_handles
-        .lock()
-        .await
-        .insert(scene_name.to_string(), status_handles);
-
-    Ok(())
+    status_handles
 }
 
 fn emit_service_status_by_status(

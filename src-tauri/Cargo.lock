@@ -276,6 +276,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "capitalize"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b5271031022835ee8c7582fe67403bd6cb3d962095787af7921027234bab5bf"
+
+[[package]]
 name = "cargo_toml"
 version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -579,9 +585,11 @@ name = "dcompose-workbench"
 version = "0.0.0"
 dependencies = [
  "bollard",
+ "capitalize",
  "chrono",
  "fs_extra",
  "futures",
+ "path-absolutize",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -1942,6 +1950,24 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "windows-targets 0.48.5",
+]
+
+[[package]]
+name = "path-absolutize"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4af381fe79fa195b4909485d99f73a80792331df0625188e707854f0b3383f5"
+dependencies = [
+ "path-dedot",
+]
+
+[[package]]
+name = "path-dedot"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07ba0ad7e047712414213ff67533e6dd477af0a4e1d14fb52343e53d30ea9397"
+dependencies = [
+ "once_cell",
 ]
 
 [[package]]

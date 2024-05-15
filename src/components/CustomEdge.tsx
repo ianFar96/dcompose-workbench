@@ -38,7 +38,7 @@ export default function CustomEdge(props: EdgeProps<CustomEdgeData>) {
         onClose={() => setIsDrawerOpen(false)}
         open={isDrawerOpen}
       >
-        {props.data ? <EdgeDrawer edge={props} sceneName={props.data.sceneName} /> : undefined}
+        {props.data ? <EdgeDrawer {...props} /> : undefined}
       </Drawer>
     </>
   );

@@ -5,11 +5,15 @@ use std::{
     process::Command,
 };
 
+use path_absolutize::Absolutize;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
 use crate::{
-    docker::{self, DockerComposeDependsOn, DockerComposeService},
+    docker::{
+        self, DockerComposeDependsOn, DockerComposeIncludeEnum, DockerComposeIncludeStringOrList,
+        DockerComposeService,
+    },
     state::AppState,
     utils::get_config_dirpath,
 };
@@ -27,13 +31,15 @@ impl From<DockerComposeDependsOn> for DependsOn {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct Service {
     pub id: String,
     #[serde(rename = "type")]
     pub type_name: Option<String>,
     #[serde(rename = "dependsOn")]
     pub depends_on: HashMap<String, DependsOn>,
+    #[serde(rename = "sceneName")]
+    pub scene_name: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -89,7 +95,7 @@ pub fn delete_scene(scene_name: &str) -> Result<(), String> {
 }
 
 #[tauri::command(async)]
-pub async fn get_scene_services(scene_name: &str) -> Result<Vec<Service>, String> {
+pub fn get_scene_services(scene_name: &str) -> Result<Vec<Service>, String> {
     let docker_compose_file = docker::get_docker_compose_file(scene_name)?;
     let mut services: Vec<Service> = vec![];
     for (service_id, service) in docker_compose_file.services {
@@ -105,7 +111,48 @@ pub async fn get_scene_services(scene_name: &str) -> Result<Vec<Service>, String
                 .into_iter()
                 .map(|depends_on| (depends_on.0, depends_on.1.into()))
                 .collect(),
+            scene_name: scene_name.to_string(),
         });
+    }
+
+    if let Some(include) = docker_compose_file.include {
+        for include_item in include {
+            let path = match include_item {
+                DockerComposeIncludeEnum::String(path) => Some(path),
+                DockerComposeIncludeEnum::Object(obj) => match obj.path {
+                    Some(DockerComposeIncludeStringOrList::String(path)) => Some(path),
+                    Some(DockerComposeIncludeStringOrList::List(paths)) => {
+                        paths.first().map(|path| path.to_string())
+                    }
+                    None => None,
+                },
+            };
+
+            if let Some(path) = path {
+                let include_filepath = get_config_dirpath()
+                    .join("scenes")
+                    .join(scene_name)
+                    .join(path.clone());
+                let include_filepath = include_filepath
+                    .absolutize()
+                    .map_err(|err| format!("Unable to resolve local path for ${path}: {err}"))?;
+
+                let scene_name = include_filepath
+                    .parent()
+                    .unwrap()
+                    .iter()
+                    .last()
+                    .unwrap()
+                    .to_str()
+                    .unwrap();
+
+                let external_services = get_scene_services(scene_name)?;
+                services = services
+                    .into_iter()
+                    .chain(external_services.into_iter())
+                    .collect();
+            }
+        }
     }
 
     Ok(services)

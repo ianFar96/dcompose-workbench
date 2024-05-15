@@ -1,3 +1,4 @@
+/* eslint-disable no-await-in-loop */
 /* eslint-disable @typescript-eslint/no-use-before-define */
 /* eslint-disable no-case-declarations */
 /* eslint-disable no-empty-function */
@@ -8,7 +9,7 @@ import dagre from 'dagre';
 import { useConfirm } from 'material-ui-confirm';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { Connection, Edge, Node, NodeChange } from 'reactflow';
+import type { Connection, Edge, EdgeChange, Node, NodeChange } from 'reactflow';
 import { Background, ControlButton, Controls, MiniMap, Position, default as ReactFlow, addEdge, useEdgesState, useNodesState } from 'reactflow';
 
 import type { CustomEdgeData } from '../components/CustomEdge';
@@ -75,15 +76,33 @@ export default function Scene() {
     .then(services => {
       setServiceIds(services.map(service => service.id));
 
+      // const sceneGroups = services.reduce<Node[]>((acc, service) => {
+      //   acc.push({
+      //     data: { label: 'Label' },
+      //     id: 'dev-scene-2',
+      //     position: { x: 0, y: 0 },
+      //     style: {
+      //       height: 1000,
+      //       width: 1000,
+      //     },
+      //     type: 'group',
+      //   });
+
+      //   return acc;
+      // }, []);
+
       const sceneNodes: Node<CustomNodeData>[] = services.map(service => ({
         data: {
           onDeleteService,
           reloadScene,
           sceneName,
           serviceId: service.id,
+          serviceSceneName: service.sceneName,
           serviceType: service.type,
         },
+        extent: 'parent',
         id: service.id,
+        parentId: sceneName !== service.sceneName ? service.sceneName : undefined,
         position: { x: 0, y: 0 },
         type: 'custom',
       }));
@@ -149,15 +168,15 @@ export default function Scene() {
       .catch(error => message(error as string, { title: 'Error', type: 'error' }));
   }, [sceneName, setEdges]);
 
-  const onEdgesDelete = useCallback((edgesToDelete: Edge[]) => {
+  const onEdgesDelete = useCallback(async (edgesToDelete: Edge[]) => {
     for (const edge of edgesToDelete) {
-      invoke('delete_dependency', { sceneName, source: edge.source, target: edge.target })
-        .then(() => {
-          setEdges(edges => edges.filter(edge => !edgesToDelete.includes(edge)));
-        })
-        .catch(error => message(error as string, { title: 'Error', type: 'error' }));
+      try {
+        await invoke('delete_dependency', { sceneName, source: edge.source, target: edge.target });
+      } catch (error) {
+        await message(error as string, { title: 'Error', type: 'error' });
+      }
     }
-  }, [sceneName, setEdges]);
+  }, [sceneName]);
 
   const onLayout = useCallback(() => {
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges);
@@ -189,20 +208,39 @@ export default function Scene() {
   }, [reloadScene]);
 
   const confirm = useConfirm();
-  const onDeleteService = useCallback((serviceId: string) => {
-    confirm({
-      cancellationButtonProps: { variant: 'text' },
-      cancellationText: 'No',
-      confirmationButtonProps: { color: 'error', variant: 'contained' },
-      confirmationText: 'Yes',
-      description: `The service "${serviceId}" will be deleted along with its configuration and local assets. Are you sure you want to proceed?`,
-      title: 'Delete service',
-    }).then(() => {
-      invoke('delete_service', { sceneName, serviceId })
-        .then(() => reloadScene())
-        .catch(error => message(error as string, { title: 'Error', type: 'error' }));
-    }).catch(() => {});
-  }, [confirm, reloadScene, sceneName]);
+  const onDeleteService = useCallback(async (serviceId: string) => {
+    try {
+      await confirm({
+        cancellationButtonProps: { variant: 'text' },
+        cancellationText: 'No',
+        confirmationButtonProps: { color: 'error', variant: 'contained' },
+        confirmationText: 'Yes',
+        description: `The service "${serviceId}" will be deleted along with its configuration and local assets. Are you sure you want to proceed?`,
+        title: 'Delete service',
+      });
+
+      try {
+        await invoke('delete_service', { sceneName, serviceId });
+      } catch (error) {
+        await message(error as string, { title: 'Error', type: 'error' });
+      }
+    } catch (error) { /* empty */ }
+  }, [confirm, sceneName]);
+
+  // const onDetachScene = useCallback((currentSceneName: string, externalSceneName: string) => {
+  //   confirm({
+  //     cancellationButtonProps: { variant: 'text' },
+  //     cancellationText: 'No',
+  //     confirmationButtonProps: { color: 'error', variant: 'contained' },
+  //     confirmationText: 'Yes',
+  //     description: `The scene "${externalSceneName}" will be detached from ${currentSceneName}, do you want to proceed?`,
+  //     title: 'Detach scene',
+  //   }).then(() => {
+  //     invoke('detach_scene', { sceneName: currentSceneName, sceneNameToDetach: externalSceneName })
+  //       .then(() => reloadScene())
+  //       .catch(error => message(error as string, { title: 'Error', type: 'error' }));
+  //   }).catch(() => {});
+  // }, [confirm, reloadScene]);
 
   const onCustomNodesChanges = useCallback((changes: NodeChange[]) => {
     for (const change of changes) {
@@ -210,7 +248,11 @@ export default function Scene() {
       case 'remove':
         const node = nodes.find(node => node.id === change.id);
         if (!node) { return; }
-        onDeleteService(node.data.serviceId);
+        if (node.data.serviceSceneName === node.data.sceneName) {
+          onDeleteService(node.data.serviceId).then(() => {
+            onNodesChange([change]);
+          }).catch(() => {});
+        }
         break;
 
       default:
@@ -219,6 +261,29 @@ export default function Scene() {
       }
     }
   }, [nodes, onDeleteService, onNodesChange]);
+
+  const onCustomEdgeChanges = useCallback((changes: EdgeChange[]) => {
+    for (const change of changes) {
+      switch (change.type) {
+      case 'remove':
+        const edge = edges.find(edge => edge.id === change.id);
+        if (!edge) { return; }
+
+        const targetNode = nodes.find(node => node.id === edge.target);
+        const isTargetExternal = targetNode?.data.sceneName !== targetNode?.data.serviceSceneName;
+        if (!isTargetExternal) {
+          onEdgesDelete([edge]).then(() => {
+            onEdgesChange([change]);
+          }).catch(() => {});
+        }
+        break;
+
+      default:
+        onEdgesChange([change]);
+        break;
+      }
+    }
+  }, [edges, nodes, onEdgesChange, onEdgesDelete]);
 
   return (
     <>
@@ -237,8 +302,7 @@ export default function Scene() {
             nodeTypes={nodeTypes}
             nodes={nodes}
             onConnect={onConnect}
-            onEdgesChange={onEdgesChange}
-            onEdgesDelete={onEdgesDelete}
+            onEdgesChange={onCustomEdgeChanges}
             onNodesChange={onCustomNodesChanges}
           >
             <Background />
