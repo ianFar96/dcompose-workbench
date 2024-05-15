@@ -5,12 +5,13 @@
 import ReplayIcon from '@mui/icons-material/Replay';
 import { invoke } from '@tauri-apps/api';
 import { message } from '@tauri-apps/api/dialog';
-import dagre from 'dagre';
+import type { ElkExtendedEdge, ElkNode } from 'elkjs/lib/elk.bundled.js';
+import ELK from 'elkjs/lib/elk.bundled.js';
 import { useConfirm } from 'material-ui-confirm';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import type { Connection, Edge, EdgeChange, Node, NodeChange } from 'reactflow';
-import { Background, ControlButton, Controls, MiniMap, Position, default as ReactFlow, addEdge, useEdgesState, useNodesState } from 'reactflow';
+import { Background, ControlButton, Controls, MiniMap, default as ReactFlow, ReactFlowProvider, addEdge, useEdgesState, useNodesState, useReactFlow } from 'reactflow';
 
 import type { CustomEdgeData } from '../components/CustomEdge';
 import CustomEdge from '../components/CustomEdge';
@@ -25,43 +26,9 @@ import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
 import 'reactflow/dist/style.css';
 
-const dagreGraph = new dagre.graphlib.Graph();
-dagreGraph.setDefaultEdgeLabel(() => ({}));
+const elk = new ELK();
 
-const nodeWidth = 208;
-const nodeHeight = 96;
-const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
-  dagreGraph.setGraph({ rankdir: 'LR', ranksep: 150 });
-
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { height: nodeHeight, width: nodeWidth });
-  });
-
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
-
-  dagre.layout(dagreGraph);
-
-  nodes.forEach((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
-    node.targetPosition = Position.Left;
-    node.sourcePosition = Position.Right;
-
-    // We are shifting the dagre node position (anchor=center center) to the top left
-    // so it matches the React Flow node anchor point (top left).
-    node.position = {
-      x: nodeWithPosition.x - nodeWidth / 2,
-      y: nodeWithPosition.y - nodeHeight / 2,
-    };
-
-    return node;
-  });
-
-  return { edges, nodes };
-};
-
-export default function Scene() {
+function Scene() {
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
   const edgeTypes = useMemo(() => ({ custom: CustomEdge }), []);
 
@@ -70,6 +37,40 @@ export default function Scene() {
 
   const { sceneName } = useParams();
   if (!sceneName) { throw new Error(); }
+
+  const { fitView } = useReactFlow();
+  const getLayoutedElements = useCallback((nodes: Node<CustomNodeData>[], edges: Edge<CustomEdgeData>[]) => {
+    const graph: ElkNode = {
+      children: nodes.map(node => ({
+        ...node,
+        height: 150,
+        sourcePosition: 'right',
+        targetPosition: 'left',
+        width: 208,
+      })),
+      edges: edges as unknown as ElkExtendedEdge[],
+      id: 'root',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      layoutOptions: {
+        'elk.algorithm': 'layered',
+        'elk.direction': 'RIGHT',
+        'elk.layered.spacing.nodeNodeBetweenLayers': 150,
+        'elk.separateConnectedComponents': false,
+        'elk.spacing.nodeNode': 50,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+    };
+
+    return elk
+      .layout(graph)
+      .then((layoutedGraph) => ({
+        edges: (layoutedGraph.edges ?? []) as unknown as Edge<CustomEdgeData>[],
+        nodes: (layoutedGraph.children?.map(node => ({
+          ...node,
+          position: { x: node.x, y: node.y },
+        })) ?? []) as Node<CustomNodeData>[],
+      }));
+  }, []);
 
   const [serviceIds, setServiceIds] = useState<string[]>([]);
   const loadScene = useCallback(() => invoke<Service[]>('get_scene_services', { sceneName })
@@ -100,9 +101,9 @@ export default function Scene() {
           serviceSceneName: service.sceneName,
           serviceType: service.type,
         },
-        extent: 'parent',
+        // extent: 'parent',
         id: service.id,
-        parentId: sceneName !== service.sceneName ? service.sceneName : undefined,
+        // parentId: sceneName !== service.sceneName ? service.sceneName : undefined,
         position: { x: 0, y: 0 },
         type: 'custom',
       }));
@@ -126,10 +127,14 @@ export default function Scene() {
         }
       }
 
-      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(sceneNodes, sceneEdges);
+      getLayoutedElements(sceneNodes, sceneEdges)
+        .then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
+          setNodes(layoutedNodes);
+          setEdges(layoutedEdges);
 
-      setNodes(layoutedNodes);
-      setEdges(layoutedEdges);
+          window.requestAnimationFrame(() => fitView());
+        })
+        .catch(() => {});
     }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [sceneName, setEdges, setNodes]);
@@ -150,6 +155,17 @@ export default function Scene() {
         .catch(error => message(error as string, { title: 'Error', type: 'error' }));
     };
   }, [loadScene, startEmittingSceneStatus, stopEmittingSceneStatus]);
+
+  const onLayout = useCallback(() => {
+    getLayoutedElements(nodes, edges)
+      .then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
+        setNodes(layoutedNodes);
+        setEdges(layoutedEdges);
+
+        window.requestAnimationFrame(() => fitView());
+      })
+      .catch(() => {});
+  }, [getLayoutedElements, nodes, edges, setNodes, setEdges, fitView]);
 
   const onConnect = useCallback((connection: Connection) => {
     invoke('create_dependency', { sceneName, source: connection.source, target: connection.target })
@@ -177,12 +193,6 @@ export default function Scene() {
       }
     }
   }, [sceneName]);
-
-  const onLayout = useCallback(() => {
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges);
-    setNodes([...layoutedNodes]);
-    setEdges([...layoutedEdges]);
-  }, [nodes, edges, setNodes, setEdges]);
 
   const reloadScene = useCallback(() => {
     stopEmittingSceneStatus()
@@ -316,5 +326,14 @@ export default function Scene() {
         </div>
       </div>
     </>
+  );
+}
+
+// eslint-disable-next-line func-names
+export default function () {
+  return (
+    <ReactFlowProvider>
+      <Scene />
+    </ReactFlowProvider>
   );
 }
