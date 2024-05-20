@@ -76,33 +76,17 @@ export default function Scene() {
     .then(services => {
       setServiceIds(services.map(service => service.id));
 
-      // const sceneGroups = services.reduce<Node[]>((acc, service) => {
-      //   acc.push({
-      //     data: { label: 'Label' },
-      //     id: 'dev-scene-2',
-      //     position: { x: 0, y: 0 },
-      //     style: {
-      //       height: 1000,
-      //       width: 1000,
-      //     },
-      //     type: 'group',
-      //   });
-
-      //   return acc;
-      // }, []);
-
       const sceneNodes: Node<CustomNodeData>[] = services.map(service => ({
         data: {
-          onDeleteService,
+          onDeleteService: (serviceId: string) => { onDeleteService(serviceId).catch(() => {}); },
+          onDetachScene,
           reloadScene,
           sceneName,
           serviceId: service.id,
           serviceSceneName: service.sceneName,
           serviceType: service.type,
         },
-        extent: 'parent',
         id: service.id,
-        parentId: sceneName !== service.sceneName ? service.sceneName : undefined,
         position: { x: 0, y: 0 },
         type: 'custom',
       }));
@@ -208,39 +192,37 @@ export default function Scene() {
   }, [reloadScene]);
 
   const confirm = useConfirm();
-  const onDeleteService = useCallback(async (serviceId: string) => {
-    try {
-      await confirm({
-        cancellationButtonProps: { variant: 'text' },
-        cancellationText: 'No',
-        confirmationButtonProps: { color: 'error', variant: 'contained' },
-        confirmationText: 'Yes',
-        description: `The service "${serviceId}" will be deleted along with its configuration and local assets. Are you sure you want to proceed?`,
-        title: 'Delete service',
+  const onDeleteService = useCallback((serviceId: string) => {
+    return confirm({
+      cancellationButtonProps: { variant: 'text' },
+      cancellationText: 'No',
+      confirmationButtonProps: { color: 'error', variant: 'contained' },
+      confirmationText: 'Yes',
+      description: `The service "${serviceId}" will be deleted along with its configuration and local assets. Are you sure you want to proceed?`,
+      title: 'Delete service',
+    }).then(() => {
+      invoke('delete_service', { sceneName, serviceId }).catch(error => {
+        message(error as string, { title: 'Error', type: 'error' }).catch(() => {});
       });
-
-      try {
-        await invoke('delete_service', { sceneName, serviceId });
-      } catch (error) {
-        await message(error as string, { title: 'Error', type: 'error' });
-      }
-    } catch (error) { /* empty */ }
+    }).catch(() => {});
   }, [confirm, sceneName]);
 
-  // const onDetachScene = useCallback((currentSceneName: string, externalSceneName: string) => {
-  //   confirm({
-  //     cancellationButtonProps: { variant: 'text' },
-  //     cancellationText: 'No',
-  //     confirmationButtonProps: { color: 'error', variant: 'contained' },
-  //     confirmationText: 'Yes',
-  //     description: `The scene "${externalSceneName}" will be detached from ${currentSceneName}, do you want to proceed?`,
-  //     title: 'Detach scene',
-  //   }).then(() => {
-  //     invoke('detach_scene', { sceneName: currentSceneName, sceneNameToDetach: externalSceneName })
-  //       .then(() => reloadScene())
-  //       .catch(error => message(error as string, { title: 'Error', type: 'error' }));
-  //   }).catch(() => {});
-  // }, [confirm, reloadScene]);
+  const onDetachScene = useCallback((currentSceneName: string, externalSceneName: string) => {
+    confirm({
+      cancellationButtonProps: { variant: 'text' },
+      cancellationText: 'No',
+      confirmationButtonProps: { color: 'error', variant: 'contained' },
+      confirmationText: 'Yes',
+      description: `The scene "${externalSceneName}" will be detached from "${currentSceneName}". Are you sure you want to proceed?`,
+      title: 'Detach scene',
+    }).then(() => {
+      invoke('detach_scene', { sceneName: currentSceneName, sceneNameToDetach: externalSceneName })
+        .then(() => reloadScene())
+        .catch(error => {
+          message(error as string, { title: 'Error', type: 'error' }).catch(() => {});
+        });
+    }).catch(() => {});
+  }, [confirm, reloadScene]);
 
   const onCustomNodesChanges = useCallback((changes: NodeChange[]) => {
     for (const change of changes) {

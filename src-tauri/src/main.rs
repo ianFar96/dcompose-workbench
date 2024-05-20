@@ -11,6 +11,7 @@ async fn main() {
             commands::get_scenes,
             commands::create_scene,
             commands::delete_scene,
+            commands::detach_scene,
             commands::get_scene_services,
             commands::get_service,
             commands::create_service,

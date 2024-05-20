@@ -1,9 +1,8 @@
-import { ArrowBack, Edit, Folder, OpenInNew, Search } from '@mui/icons-material';
-import { Box, Button, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
+import { ArrowBack, Edit, Folder, Search } from '@mui/icons-material';
+import { Box, Button, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
 import { message } from '@tauri-apps/api/dialog';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type { Node, NodeProps } from 'reactflow';
 import { useReactFlow } from 'reactflow';
 
@@ -14,7 +13,13 @@ import ServiceLogs from './ServiceLogs';
 
 type Pages = undefined | 'logs' | 'edit' | 'assets'
 
-export default function NodeDrawer(props: NodeProps<CustomNodeData>) {
+type NodeDrawerProps = {
+  open: boolean
+  onClose: () => void
+  onDeleteService: (serviceId: string) => void
+}
+
+export default function NodeDrawer(props: NodeProps<CustomNodeData> & NodeDrawerProps) {
   const [page, setPage] = useState<Pages>();
 
   const { getNodes } = useReactFlow();
@@ -35,8 +40,6 @@ export default function NodeDrawer(props: NodeProps<CustomNodeData>) {
       props.data?.reloadScene();
     }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
   }, [props]);
-
-  const navigate = useNavigate();
 
   const mainList = useMemo(() => {
     switch (page) {
@@ -139,7 +142,11 @@ export default function NodeDrawer(props: NodeProps<CustomNodeData>) {
 
           <hr />
           <div className='flex justify-end px-4 py-3'>
-            <Button color='error' onClick={() => props.data?.onDeleteService(props.data?.serviceId)} variant='contained'>
+            <Button
+              color='error'
+              onClick={() => props.onDeleteService(props.data?.serviceId)}
+              variant='contained'
+            >
               Delete
             </Button>
           </div>
@@ -148,61 +155,13 @@ export default function NodeDrawer(props: NodeProps<CustomNodeData>) {
     }
   }, [onEditService, page, props, serviceIds]);
 
-  const externalList = useMemo(() => {
-    switch (page) {
-    case 'logs':
-      return (
-        <Box className='w-[50vw] h-screen flex flex-col' role='presentation'>
-          <div className='flex items-center px-6 py-4'>
-            <button
-              className='mr-2 -ml-2'
-              onClick={() => setPage(undefined)}
-            >
-              <ArrowBack fontSize='small' />
-            </button>
-            <h2 className='text-lg whitespace-nowrap'>{props.data?.serviceId}</h2>
-          </div>
-          <hr />
-
-          <ServiceLogs sceneName={props.data?.sceneName} serviceId={props.data?.serviceId} />
-        </Box>
-      );
-    case undefined:
-    default:
-      return (
-        <Box className='min-w-72 flex flex-col h-full' role='presentation'>
-          <div className='px-6 py-4'>
-            <h2 className='text-lg whitespace-nowrap'>{props.data?.serviceId}</h2>
-          </div>
-          <hr />
-
-          <List className='h-full'>
-            <ListItem disablePadding>
-              <ListItemButton onClick={() => setPage('logs')}>
-                <ListItemIcon>
-                  <Search />
-                </ListItemIcon>
-                <ListItemText primary='Logs' />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton onClick={() => navigate(`/scenes/${props.data?.serviceSceneName}`)}>
-                <ListItemIcon>
-                  <OpenInNew />
-                </ListItemIcon>
-                <ListItemText primary='Go to scene' />
-              </ListItemButton>
-            </ListItem>
-          </List>
-        </Box>
-      );
-    }
-  }, [navigate, page, props]);
-
-  const isExternal = useMemo(() => props.data?.sceneName !== props.data?.serviceSceneName,
-    [props.data?.sceneName, props.data?.serviceSceneName]);
-
-  return (<>
-    {isExternal ? externalList : mainList}
-  </>);
+  return (
+    <Drawer
+      anchor='right'
+      onClose={props.onClose}
+      open={props.open}
+    >
+      {mainList}
+    </Drawer>
+  );
 }

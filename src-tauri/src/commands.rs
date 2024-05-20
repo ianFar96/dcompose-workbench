@@ -83,8 +83,7 @@ pub fn create_scene(scene_name: &str) -> Result<(), String> {
         .map_err(|err| format!("Could not create scene folder {scene_name}: {err}"))?;
 
     let docker_compose_path = scene_path.join("docker-compose.yml");
-    let docker_compose_contents = "services: {}";
-    fs::write(docker_compose_path, docker_compose_contents)
+    fs::write(docker_compose_path, "services: {}")
         .map_err(|err| format!("Could not create docker-compose.yml for scene {scene_name}: {err}"))
 }
 
@@ -92,6 +91,57 @@ pub fn create_scene(scene_name: &str) -> Result<(), String> {
 pub fn delete_scene(scene_name: &str) -> Result<(), String> {
     let scene_path = get_config_dirpath().join("scenes").join(scene_name);
     fs::remove_dir_all(scene_path).map_err(|err| format!("Could not delete scene: {err}"))
+}
+
+#[tauri::command(async)]
+pub fn detach_scene(scene_name: &str, scene_name_to_detach: &str) -> Result<(), String> {
+    let mut docker_compose = docker::get_docker_compose_file(scene_name)?;
+    if let Some(include) = docker_compose.include {
+        let include = include
+            .into_iter()
+            .try_fold(vec![], |mut acc, include_item| {
+                let path = match &include_item {
+                    DockerComposeIncludeEnum::String(path) => Some(path),
+                    DockerComposeIncludeEnum::Object(obj) => match &obj.path {
+                        Some(DockerComposeIncludeStringOrList::String(path)) => Some(path),
+                        Some(DockerComposeIncludeStringOrList::List(paths)) => paths.first(),
+                        None => None,
+                    },
+                };
+
+                match path {
+                    Some(path) => {
+                        let include_filepath = get_config_dirpath()
+                            .join("scenes")
+                            .join(scene_name)
+                            .join(path.clone());
+                        let include_filepath = include_filepath.absolutize().map_err(|err| {
+                            format!("Unable to resolve local path for ${path}: {err}")
+                        })?;
+
+                        let scene_name = include_filepath
+                            .parent()
+                            .unwrap()
+                            .iter()
+                            .last()
+                            .unwrap()
+                            .to_str()
+                            .unwrap();
+
+                        if scene_name != scene_name_to_detach {
+                            acc.push(include_item);
+                        }
+                    }
+                    None => acc.push(include_item),
+                }
+
+                Ok::<_, String>(acc)
+            })?;
+
+        docker_compose.include = Some(include);
+    }
+
+    docker::write_docker_compose_file(scene_name, &docker_compose)
 }
 
 #[tauri::command(async)]

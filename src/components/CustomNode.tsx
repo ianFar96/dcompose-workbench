@@ -1,5 +1,5 @@
 import { Error, Pause, PlayArrow, QuestionMark, Refresh } from '@mui/icons-material';
-import { Button, Card, CardContent, Chip, Drawer, Typography } from '@mui/material';
+import { Button, Card, CardContent, Chip, Typography } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
 import { message } from '@tauri-apps/api/dialog';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -9,6 +9,7 @@ import { Handle, Position } from 'reactflow';
 import useTauriEvent from '../hooks/useTauriEvent';
 import type { ServiceStatus, StatusEventPayload } from '../types/service';
 
+import ExternalNodeDrawer from './ExternalNodeDrawer';
 import NodeDrawer from './NodeDrawer';
 
 export type CustomNodeData = {
@@ -18,6 +19,7 @@ export type CustomNodeData = {
   serviceSceneName: string
   reloadScene: () => void
   onDeleteService: (serviceId: string) => void
+  onDetachScene: (sceneName: string, externalSceneName: string) => void
 }
 
 export default function CustomNode(props: NodeProps<CustomNodeData>) {
@@ -102,6 +104,7 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
         </Button>
       );
     case 'unknown':
+    default:
       return (
         <Button
           className='absolute -top-8 left-0 w-6 h-6 min-w-[unset] p-0'
@@ -140,13 +143,21 @@ export default function CustomNode(props: NodeProps<CustomNodeData>) {
         </CardContent>
       </Card>
 
-      <Drawer
-        anchor='right'
-        onClose={() => setIsDrawerOpen(false)}
-        open={isDrawerOpen}
-      >
-        <NodeDrawer {...props} />
-      </Drawer>
+      {isExternal ? (
+        <ExternalNodeDrawer
+          {...props}
+          onClose={() => setIsDrawerOpen(false)}
+          onDetachScene={props.data?.onDetachScene}
+          open={isDrawerOpen}
+        />
+      ) : (
+        <NodeDrawer
+          {...props}
+          onClose={() => setIsDrawerOpen(false)}
+          onDeleteService={props.data?.onDeleteService}
+          open={isDrawerOpen}
+        />
+      )}
 
       <Handle isConnectable={!isExternal} position={Position.Left} type='target' />
       <Handle isConnectable={!isExternal} position={Position.Right} type='source' />

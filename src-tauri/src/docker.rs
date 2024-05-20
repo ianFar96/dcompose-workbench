@@ -443,14 +443,14 @@ pub async fn start_emitting_scene_status(app: &AppHandle, scene_name: &str) -> R
 
     let service_ids: Vec<String> = get_scene_service_ids(scene_name)?;
 
-    let service_status_handles =
-        emit_services_status(app, scene_name, &docker, &service_ids);
+    let service_status_handles = emit_services_status(app, scene_name, &docker, &service_ids);
 
     let state = app.state::<AppState>();
-    state.service_status_handles.lock().await.insert(
-        scene_name.to_string(),
-        service_status_handles,
-    );
+    state
+        .service_status_handles
+        .lock()
+        .await
+        .insert(scene_name.to_string(), service_status_handles);
 
     Ok(())
 }
@@ -494,7 +494,10 @@ fn get_scene_service_ids(scene_name: &str) -> Result<Vec<String>, String> {
                     .unwrap();
 
                 let external_services = get_scene_service_ids(scene_name)?;
-                service_ids = service_ids.into_iter().chain(external_services.into_iter()).collect();
+                service_ids = service_ids
+                    .into_iter()
+                    .chain(external_services.into_iter())
+                    .collect();
             }
         }
     }
@@ -506,7 +509,7 @@ fn emit_services_status(
     app: &AppHandle,
     scene_name: &str,
     docker: &Docker,
-    service_ids: &Vec<String>
+    service_ids: &Vec<String>,
 ) -> Vec<JoinHandle<()>> {
     let mut status_handles = Vec::with_capacity(service_ids.len());
 
@@ -527,11 +530,9 @@ fn emit_services_status(
                             thread_app
                                 .emit_all(
                                     service_status_event_name.as_ref(),
-                                    ServiceLogEventPayload {
-                                        text: format!("Error getting containers: {}", err),
-                                        timestamp: get_formatted_date(None),
-                                        clear: true,
-                                        type_name: LogType::StdErr,
+                                    ServiceStatusEventPayload {
+                                        status: ServiceStatus::Error,
+                                        message: Some(format!("Error getting containers: {}", err)),
                                     },
                                 )
                                 .unwrap();
@@ -556,7 +557,7 @@ fn emit_services_status(
                                 }
                             }
 
-                            sleep(Duration::from_secs(1)).await;
+                            sleep(Duration::from_secs(3)).await;
                         }
                     }
                 };
