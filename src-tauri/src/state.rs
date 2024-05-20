@@ -8,18 +8,10 @@ pub struct ServiceKey {
     pub service_id: String,
 }
 
+#[derive(Default)]
 pub struct AppState {
     pub service_log_handles: Arc<Mutex<HashMap<ServiceKey, JoinHandle<()>>>>,
     pub service_status_handles: Arc<Mutex<HashMap<String, Vec<JoinHandle<()>>>>>,
-}
-
-impl Default for AppState {
-    fn default() -> Self {
-        Self {
-            service_log_handles: Arc::new(Mutex::new(HashMap::new())),
-            service_status_handles: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
 }
 
 impl AppState {

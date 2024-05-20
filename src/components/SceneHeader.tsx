@@ -2,11 +2,14 @@ import { ArrowBack, MoreVert, PlayArrow, Refresh, Stop } from '@mui/icons-materi
 import { Button } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
 import { message } from '@tauri-apps/api/dialog';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import CreateServiceDrawer from '../components/CreateServiceDrawer';
 import SceneMenu from '../components/SceneMenu';
+import type { Scene } from '../types/scene';
+
+import ImportSceneDialog from './ImportSceneDialog';
 
 type SceneHeaderProps = {
   sceneName: string
@@ -46,11 +49,23 @@ export default function SceneHeader(props: SceneHeaderProps) {
   const triggerMenuRef = useRef(null);
 
   const [isCreateServiceDrawerOpen, setIsCreateDrawerDialogOpen] = useState(false);
-
   const onAfterCreateService = useCallback(() => {
     setIsCreateDrawerDialogOpen(false);
     props.reloadScene();
   }, [props]);
+
+  const [isImportSceneDialogOpen, setIsImportSceneDialogOpen] = useState(false);
+  const onAfterImportScene = useCallback(() => {
+    setIsImportSceneDialogOpen(false);
+    props.reloadScene();
+  }, [props]);
+
+  const [scenes, setScenes] = useState<Scene[]>([]);
+  useEffect(() => {
+    invoke<Scene[]>('get_scenes')
+      .then(scenes => setScenes(scenes))
+      .catch(error => message(error as string, { title: 'Error', type: 'error' }));
+  }, []);
 
   return (
     <>
@@ -98,6 +113,7 @@ export default function SceneHeader(props: SceneHeaderProps) {
         <SceneMenu
           actions={{
             createService: () => setIsCreateDrawerDialogOpen(true),
+            importScene: () => setIsImportSceneDialogOpen(true),
             openVsCode,
             reloadScene: props.reloadScene,
           }}
@@ -114,6 +130,13 @@ export default function SceneHeader(props: SceneHeaderProps) {
         sceneName={props.sceneName}
         serviceIds={props.serviceIds}
       />
+
+      <ImportSceneDialog
+        handleClose={() => setIsImportSceneDialogOpen(false)}
+        onAfterImportScene={onAfterImportScene}
+        open={isImportSceneDialogOpen}
+        sceneName={props.sceneName}
+        scenes={scenes} />
     </>
   );
 }

@@ -7,7 +7,7 @@ import { useConfirm } from 'material-ui-confirm';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import CreateScene from '../components/CreateScene';
+import CreateSceneDialog from '../components/CreateSceneDialog';
 import type { Scene } from '../types/scene';
 
 export default function Scenes() {
@@ -42,11 +42,9 @@ export default function Scenes() {
   }, [confirm, loadScenes]);
 
   const [isCreateSceneDialogOpen, setIsCreateSceneDialogOpen] = useState(false);
-  const handleCreateScene = useCallback((sceneName: string) => {
-    invoke('create_scene', { sceneName }).then(() => {
-      setIsCreateSceneDialogOpen(false);
-      loadScenes();
-    }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
+  const onAfterCreateScene = useCallback(() => {
+    setIsCreateSceneDialogOpen(false);
+    loadScenes();
   }, [loadScenes]);
 
   return (
@@ -94,9 +92,9 @@ export default function Scenes() {
         </TableContainer>
       </div>
 
-      <CreateScene
+      <CreateSceneDialog
         handleClose={() => setIsCreateSceneDialogOpen(false)}
-        handleSubmit={handleCreateScene}
+        onAfterCreateScene={onAfterCreateScene}
         open={isCreateSceneDialogOpen}
         scenes={scenes}
       />

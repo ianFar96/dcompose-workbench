@@ -1,16 +1,18 @@
-import { Dialog, DialogTitle, DialogContent, DialogContentText, TextField, DialogActions, Button } from '@mui/material';
+import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField } from '@mui/material';
+import { invoke } from '@tauri-apps/api';
+import { message } from '@tauri-apps/api/dialog';
 import React, { useState } from 'react';
 
 import type { Scene } from '../types/scene';
 
 type CreateSceneDialogProps = {
   open: boolean
-  handleSubmit: (sceneName: string) => void
+  onAfterCreateScene: () => void
   handleClose: () => void
   scenes: Scene[]
 }
 
-export default function CreateScene(props: CreateSceneDialogProps) {
+export default function CreateSceneDialog(props: CreateSceneDialogProps) {
   const [isSceneNameTaken, setIsSceneNameTaken] = useState(false);
 
   return (
@@ -27,7 +29,9 @@ export default function CreateScene(props: CreateSceneDialogProps) {
           setIsSceneNameTaken(isSceneNameTaken);
 
           if (!isSceneNameTaken) {
-            props.handleSubmit(sceneName as string);
+            invoke('create_scene', { sceneName })
+              .then(() => props.onAfterCreateScene())
+              .catch(error => message(error as string, { title: 'Error', type: 'error' }));
           }
         },
       }}

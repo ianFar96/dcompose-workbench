@@ -84,7 +84,7 @@ pub enum DockerComposeIncludeEnum {
     Object(DockerComposeIncludeObject),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DockerComposeIncludeObject {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<DockerComposeIncludeStringOrList>,

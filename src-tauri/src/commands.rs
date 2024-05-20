@@ -11,8 +11,7 @@ use tauri::{AppHandle, State};
 
 use crate::{
     docker::{
-        self, DockerComposeDependsOn, DockerComposeIncludeEnum, DockerComposeIncludeStringOrList,
-        DockerComposeService,
+        self, DockerComposeDependsOn, DockerComposeIncludeEnum, DockerComposeIncludeObject, DockerComposeIncludeStringOrList, DockerComposeService
     },
     state::AppState,
     utils::get_config_dirpath,
@@ -141,6 +140,23 @@ pub fn detach_scene(scene_name: &str, scene_name_to_detach: &str) -> Result<(), 
         docker_compose.include = Some(include);
     }
 
+    docker::write_docker_compose_file(scene_name, &docker_compose)
+}
+
+#[tauri::command(async)]
+pub fn import_scene(scene_name: &str, scene_name_to_import: &str) -> Result<(), String>  {
+    let mut docker_compose = docker::get_docker_compose_file(scene_name)?;
+    let mut include = match docker_compose.include {
+        Some(x) => x,
+        None => vec![]
+    };
+
+    include.push(DockerComposeIncludeEnum::Object(DockerComposeIncludeObject {
+        path: Some(DockerComposeIncludeStringOrList::String(format!("../{scene_name_to_import}/docker-compose.yml"))),
+        ..Default::default()
+    }));
+
+    docker_compose.include = Some(include);
     docker::write_docker_compose_file(scene_name, &docker_compose)
 }
 
@@ -428,18 +444,17 @@ fn get_service_assets_recursive(
                     let entry = entry.unwrap();
 
                     let is_dir = entry.path().is_dir();
+                    let entry_name = entry.file_name().to_string_lossy().to_string();
                     if is_dir {
                         let next_service_assets = get_service_assets_recursive(entry.path(), scene_name, service_id)?;
 
-                        let dir_name = entry.path().iter().last().unwrap().to_string_lossy().to_string();
                         service_assets.insert(
-                            dir_name,
+                            entry_name,
                             ServiceAssets::Node(next_service_assets)
                         );
                     } else {
-                        let file_name = entry.file_name().to_string_lossy().to_string();
                         service_assets.insert(
-                            file_name,
+                            entry_name,
                             ServiceAssets::Leaf,
                         );
                     }

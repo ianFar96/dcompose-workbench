@@ -15,9 +15,9 @@ type CreateServiceDrawerProps = {
 
 export default function CreateServiceDrawer(props: CreateServiceDrawerProps) {
   const handleCreateService = useCallback((serviceId: string, code: string) => {
-    invoke('create_service', { code, sceneName: props.sceneName, serviceId }).then(() => {
-      props.onAfterCreateService();
-    }).catch(error => message(error as string, { title: 'Error', type: 'error' }));
+    invoke('create_service', { code, sceneName: props.sceneName, serviceId })
+      .then(() => props.onAfterCreateService())
+      .catch(error => message(error as string, { title: 'Error', type: 'error' }));
   }, [props]);
 
   return (
