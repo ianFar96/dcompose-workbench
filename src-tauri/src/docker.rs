@@ -455,7 +455,7 @@ pub async fn start_emitting_scene_status(app: &AppHandle, scene_name: &str) -> R
     Ok(())
 }
 
-fn get_scene_service_ids(scene_name: &str) -> Result<Vec<String>, String> {
+pub fn get_scene_service_ids(scene_name: &str) -> Result<Vec<String>, String> {
     let docker_compose_file = get_docker_compose_file(scene_name)?;
     let mut service_ids: Vec<String> = vec![];
     for (service_id, _) in docker_compose_file.services {

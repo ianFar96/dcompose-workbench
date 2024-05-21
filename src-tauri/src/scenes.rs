@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::PathBuf,
+};
 
 use path_absolutize::Absolutize;
 use serde::{Deserialize, Serialize};
@@ -7,7 +11,9 @@ use crate::{
     docker::{
         self, DockerComposeIncludeEnum, DockerComposeIncludeObject,
         DockerComposeIncludeStringOrList,
-    }, services::Service, utils::get_config_dirpath
+    },
+    services::Service,
+    utils::get_config_dirpath,
 };
 
 #[derive(Deserialize, Serialize)]
@@ -160,6 +166,24 @@ pub fn import_scene(scene_name: &str, scene_name_to_import: &str) -> Result<(), 
         Some(x) => x,
         None => vec![],
     };
+
+    let service_ids = docker::get_scene_service_ids(scene_name)?;
+    let service_ids_to_import = docker::get_scene_service_ids(scene_name_to_import)?;
+
+    let service_ids_set: HashSet<String> = HashSet::from_iter(service_ids);
+    let service_ids_to_import_set: HashSet<String> = HashSet::from_iter(service_ids_to_import);
+    let intersection: HashSet<_> = service_ids_set
+        .intersection(&service_ids_to_import_set)
+        .collect();
+
+    if !intersection.is_empty() {
+        let intersection_names = intersection
+            .into_iter()
+            .map(|str| str.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(format!("Cannot import scene {scene_name_to_import} because there are services with overlapping names: {intersection_names}"));
+    }
 
     include.push(DockerComposeIncludeEnum::Object(
         DockerComposeIncludeObject {
