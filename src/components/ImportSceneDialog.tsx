@@ -1,7 +1,7 @@
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
 import { message } from '@tauri-apps/api/dialog';
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 
 import type { Scene } from '../types/scene';
 
@@ -10,10 +10,21 @@ type ImportSceneDialogProps = {
   onAfterImportScene: () => void
   handleClose: () => void
   sceneName: string
-  scenes: Scene[]
 }
 
 export default function ImportSceneDialog(props: ImportSceneDialogProps) {
+  const [availableScenes, setAvailableScenes] = useState<Scene[]>([]);
+  const getAvailableScenes = useCallback(() => {
+    const getScenesPromise = invoke<Scene[]>('get_scenes');
+    const getIncludedScenesPromise = invoke<Scene[]>('get_included_scenes', { sceneName: props.sceneName });
+    Promise.all([getScenesPromise, getIncludedScenesPromise])
+      .then(([scenes, includedScenes]) => {
+        const includedSceneNames = includedScenes.map(scene => scene.name);
+        setAvailableScenes(scenes.filter(scene => scene.name !== props.sceneName && !includedSceneNames.includes(scene.name)));
+      })
+      .catch(error => message(error as string, { title: 'Error', type: 'error' }));
+  }, [props.sceneName]);
+
   return (
     <Dialog
       PaperProps={{
@@ -47,8 +58,9 @@ export default function ImportSceneDialog(props: ImportSceneDialogProps) {
             label='Scene'
             labelId='select-scene-label'
             name='sceneName'
+            onOpen={getAvailableScenes}
           >
-            {props.scenes.filter(scene => scene.name !== props.sceneName).map(({ name: sceneName }) => (
+            {availableScenes.map(({ name: sceneName }) => (
               <MenuItem key={sceneName} value={sceneName}>{sceneName}</MenuItem>
             ))}
           </Select>

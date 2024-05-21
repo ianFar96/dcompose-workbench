@@ -45,7 +45,7 @@ export default function SceneMenu(props: SceneMenuProps) {
             <ListItemIcon>
               <Refresh fontSize='small' />
             </ListItemIcon>
-            <ListItemText className='w-48'>Reload scene</ListItemText>
+            <ListItemText className='w-48'>Refresh scene</ListItemText>
             <Typography color='text.secondary' variant='body2'>
               ctrl+r
             </Typography>
