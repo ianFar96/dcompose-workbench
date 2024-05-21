@@ -32,17 +32,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
 
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          # cache: 'yarn' # Set this to npm, yarn or pnpm.
+        
       - name: enable corepack for yarn@4
         run: |
           corepack enable
           corepack prepare yarn@stable --activate
           yarn set version stable
-
-      - name: setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-          cache: 'yarn' # Set this to npm, yarn or pnpm.
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
