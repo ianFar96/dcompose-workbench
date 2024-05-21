@@ -12,9 +12,7 @@
 
 ![DCompose Workbench screenshot](public/screenshots/canvas.png)
 
-DCompose Workbench is a desktop app for Ubuntu/Debian (*) made to manage your <code>docker-compose.yml</code> files in a visual and organized way. 
-
-\* Mac and Windows are not officially supported right now but since the project is made with [Tauri](https://tauri.app/) you can always clone it and build the package for your OS with the command `npm ci && npm run tauri build`.
+DCompose Workbench is a desktop app made to manage your <code>docker-compose.yml</code> files in a visual and organized way. 
 
 ## Getting Started
 
