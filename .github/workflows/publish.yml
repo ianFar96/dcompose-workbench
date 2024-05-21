@@ -36,6 +36,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
+          # Disabled because on Windows fails
           # cache: 'yarn' # Set this to npm, yarn or pnpm.
         
       - name: enable corepack for yarn@4
