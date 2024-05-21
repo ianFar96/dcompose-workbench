@@ -6,3 +6,4 @@
 - Git-ify the scenes
 - Delete volumes
 - Autocomplete in service edit
+- test e2e and unit
