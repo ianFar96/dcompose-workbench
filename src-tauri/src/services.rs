@@ -1,16 +1,16 @@
 use std::{
-  collections::{BTreeMap, HashMap},
-  fs,
-  path::PathBuf,
+    collections::{BTreeMap, HashMap},
+    fs,
+    path::PathBuf,
 };
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
 use crate::{
-  docker::{self, DockerComposeDependsOn, DockerComposeService},
-  state::AppState,
-  utils::get_config_dirpath,
+    docker::{self, DockerComposeDependsOn, DockerComposeService},
+    state::AppState,
+    utils::get_config_dirpath,
 };
 
 #[derive(Deserialize, Serialize)]
@@ -105,6 +105,22 @@ pub fn update_service(
     docker_compose_file
         .services
         .insert(service_id.to_string(), deserialized_code);
+
+    docker_compose_file.services = docker_compose_file
+        .services
+        .into_iter()
+        .map(|(current_service_id, mut current_service)| {
+            current_service.depends_on = current_service.depends_on.map(|mut depends_on| {
+                let dependes_on_content = depends_on.remove(previous_service_id);
+                if let Some(dependes_on_content) = dependes_on_content {
+                    depends_on.insert(service_id.to_string(), dependes_on_content);
+                }
+                depends_on
+            });
+            (current_service_id, current_service)
+        })
+        .collect();
+
     docker::write_docker_compose_file(scene_name, &docker_compose_file)
 }
 
