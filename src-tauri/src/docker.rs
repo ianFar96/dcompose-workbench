@@ -11,6 +11,7 @@ use serde_yaml::Value;
 use std::{
     collections::HashMap,
     fs,
+    io::{BufRead, BufReader},
     path::PathBuf,
     process::{Command, Stdio},
     time::Duration,
@@ -126,7 +127,18 @@ pub fn write_docker_compose_file(
         .map_err(|err| format!("Cannot write file {:?}: {}", docker_compose_filepath, err))
 }
 
-pub fn run_docker_compose_up(scene_name: &str, service_id: Option<&str>) -> Result<(), String> {
+#[derive(Serialize, Clone)]
+pub struct CommandOutput {
+    #[serde(rename = "type")]
+    type_name: LogType,
+    text: String,
+}
+
+pub async fn run_docker_compose_up(
+    app: &AppHandle,
+    scene_name: &str,
+    service_id: Option<&str>,
+) -> Result<(), String> {
     let mut args = vec!["--project-name", scene_name, "up", "-d"];
     if let Some(service_id) = service_id {
         args.push(service_id);
@@ -136,7 +148,7 @@ pub fn run_docker_compose_up(scene_name: &str, service_id: Option<&str>) -> Resu
         .map(|service_id| format!(" {service_id}"))
         .unwrap_or("".to_string());
 
-    let output = Command::new("docker-compose")
+    let mut child = Command::new("docker-compose")
         .current_dir(get_docker_compose_dirpath(scene_name))
         .args(args)
         .stderr(Stdio::piped())
@@ -147,17 +159,102 @@ pub fn run_docker_compose_up(scene_name: &str, service_id: Option<&str>) -> Resu
                 "Could not start `docker-compose up{}` command: {}",
                 service_id_format_string, error
             )
-        })?
-        .wait_with_output();
+        })?;
 
-    let output = output.unwrap();
-    match output.status.success() {
-        true => Ok(()),
-        false => Err(format!(
+    let event_name = match service_id {
+        Some(service_id) => format!("{scene_name}-{service_id}-run-service-output-event"),
+        None => format!("{scene_name}-run-scene-output-event"),
+    };
+
+    let thread_app = app.clone();
+    let thread_event_name = event_name.clone();
+
+    let stdout = child.stdout.take().unwrap();
+    let stdout_handle = spawn(async move {
+        let stdout_reader = BufReader::new(stdout);
+        let stdout_lines = stdout_reader.lines();
+        for line in stdout_lines {
+            match line {
+                Ok(line) => {
+                    thread_app
+                        .emit_all(
+                            &thread_event_name,
+                            CommandOutput {
+                                type_name: LogType::StdOut,
+                                text: line,
+                            },
+                        )
+                        .unwrap();
+                }
+                Err(err) => {
+                    thread_app
+                        .emit_all(
+                            &thread_event_name,
+                            CommandOutput {
+                                type_name: LogType::StdErr,
+                                text: err.to_string(),
+                            },
+                        )
+                        .unwrap();
+                }
+            }
+        }
+    });
+
+    let thread_app = app.clone();
+    let stderr = child.stderr.take().unwrap();
+    let stderr_handle = spawn(async move {
+        let stderr_reader = BufReader::new(stderr);
+        let stderr_lines = stderr_reader.lines();
+        for line in stderr_lines {
+            match line {
+                Ok(line) => {
+                    thread_app
+                        .emit_all(
+                            &event_name,
+                            CommandOutput {
+                                type_name: LogType::StdErr,
+                                text: line,
+                            },
+                        )
+                        .unwrap();
+                }
+                Err(err) => {
+                    thread_app
+                        .emit_all(
+                            &event_name,
+                            CommandOutput {
+                                type_name: LogType::StdErr,
+                                text: err.to_string(),
+                            },
+                        )
+                        .unwrap();
+                }
+            }
+        }
+    });
+
+    stdout_handle.await.unwrap();
+    stderr_handle.await.unwrap();
+    let output = child.wait();
+
+    match output {
+        Err(err) => Err(format!(
             "Error running `docker-compose up{}` command: {}",
-            service_id_format_string,
-            String::from_utf8(output.stderr).unwrap()
+            service_id_format_string, err
         )),
+        Ok(exit_status) => {
+            if let Some(code) = exit_status.code() {
+                if code == 0 {
+                    return Ok(());
+                }
+            }
+
+            Err(format!(
+                "Error running `docker-compose up{}` command, {}",
+                service_id_format_string, exit_status
+            ))
+        }
     }
 }
 
@@ -238,7 +335,7 @@ fn get_container_names_from_services(scene_name: &str) -> Result<HashMap<String,
 }
 
 #[derive(Serialize, Clone)]
-enum LogType {
+pub enum LogType {
     #[serde(rename = "stderr")]
     StdErr,
     #[serde(rename = "stdout")]

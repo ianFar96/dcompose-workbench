@@ -2,7 +2,8 @@ import { ArrowBack, MoreVert, PlayArrow, Refresh, Stop } from '@mui/icons-materi
 import { Button } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
 import { message } from '@tauri-apps/api/dialog';
-import React, { useCallback, useRef, useState } from 'react';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import CreateServiceDrawer from '../components/CreateServiceDrawer';
@@ -19,15 +20,30 @@ type SceneHeaderProps = {
 export default function SceneHeader(props: SceneHeaderProps) {
   const navigate = useNavigate();
 
+  const [unlistenRunScene, setUnlistenRunScene] = useState<UnlistenFn | undefined>();
   const [isRunningScene, setIsRunningScene] = useState(false);
   const startAll = useCallback(() => {
     setIsRunningScene(true);
-    invoke('run_scene', { sceneName: props.sceneName })
-      .catch(error => message(error as string, { title: 'Error', type: 'error' }))
-      .finally(() => {
-        setIsRunningScene(false);
-      });
+
+    listen(`${props.sceneName}-run-scene-output-event`, event => {
+      console.log({ event });
+    })
+      .then(unlisten => {
+        setUnlistenRunScene(() => unlisten);
+
+        invoke('run_scene', { sceneName: props.sceneName })
+          .catch(error => message(error as string, { title: 'Error', type: 'error' }))
+          .finally(() => {
+            setIsRunningScene(false);
+            unlisten();
+          });
+      })
+      .catch(error => message(error as string, { title: 'Error', type: 'error' }));
   }, [props.sceneName]);
+
+  useEffect(() => {
+    return () => unlistenRunScene?.();
+  }, [unlistenRunScene]);
 
   const [isStoppingScene, setIsStoppingScene] = useState(false);
   const stopAll = useCallback(() => {

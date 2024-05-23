@@ -156,8 +156,8 @@ pub async fn stop_emitting_scene_status(
 }
 
 #[tauri::command(async)]
-pub fn run_service(scene_name: &str, service_id: &str) -> Result<(), String> {
-    docker::run_docker_compose_up(scene_name, Some(service_id))
+pub async fn run_service(app: AppHandle, scene_name: &str, service_id: &str) -> Result<(), String> {
+    docker::run_docker_compose_up(&app, scene_name, Some(service_id)).await
 }
 
 #[tauri::command(async)]

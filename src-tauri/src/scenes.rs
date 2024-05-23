@@ -6,6 +6,7 @@ use std::{
 
 use path_absolutize::Absolutize;
 use serde::{Deserialize, Serialize};
+use tauri::AppHandle;
 
 use crate::{
     docker::{
@@ -263,8 +264,8 @@ pub fn get_scene_services(scene_name: &str) -> Result<Vec<Service>, String> {
 }
 
 #[tauri::command(async)]
-pub fn run_scene(scene_name: &str) -> Result<(), String> {
-    docker::run_docker_compose_up(scene_name, None)
+pub async fn run_scene(app: AppHandle, scene_name: &str) -> Result<(), String> {
+    docker::run_docker_compose_up(&app, scene_name, None).await
 }
 
 #[tauri::command(async)]
