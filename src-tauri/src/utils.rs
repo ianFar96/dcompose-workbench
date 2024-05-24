@@ -5,6 +5,20 @@ use std::{
 use chrono::{DateTime, Utc};
 use tauri::api::path::home_dir;
 
+pub fn create_config_folders() -> Result<(), String> {
+    let scenes_path = get_config_dirpath().join("scenes");
+    let is_exists = scenes_path
+        .try_exists()
+        .map_err(|err| format!("Cannot read from config root folder: {err}"))?;
+
+    if !is_exists {
+        fs_extra::dir::create_all(scenes_path, false)
+            .map_err(|err| format!("Cannot create config root folder: {err}"))?;
+    }
+
+    Ok(())
+}
+
 pub fn get_formatted_date(date: Option<DateTime<Utc>>) -> String {
     let date: DateTime<Utc> = match date {
         None => SystemTime::now().into(),

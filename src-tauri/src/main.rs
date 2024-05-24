@@ -4,7 +4,9 @@
 use dcompose_workbench::{dependencies, scenes, services, state::AppState, utils};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), String> {
+    utils::create_config_folders()?;
+
     tauri::Builder::default()
         .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
@@ -36,4 +38,6 @@ async fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+
+    Ok(())
 }
