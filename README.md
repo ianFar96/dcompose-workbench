@@ -20,6 +20,9 @@ DCompose Workbench is a desktop app made to manage your <code>docker-compose.yml
 
 To install DCompose Workbench you just need to head to the [Releases page](https://github.com/ianFar96/dcompose-workbench/releases) and download the most recent one.
 
+Note that the app is not signed for macOS, so a warning of some sort may appear when installing or opening.
+To bypass this you can check out [this guide](https://support.apple.com/en-gb/guide/mac-help/mh40616/mac)
+
 ### Usage
 
 To start using the app you need to create a **Scene**. A Scene is nothing more than a folder with a `docker-compose.yml` file in it, located at the app's config folder `${HOME}/.dcompose-workbench`. If you wish, you can edit the whole `docker-compose.yml` file by using the "Open on VS Code" action in the top right corner menu. This makes it easier if you want to copy/paste already made docker compose files into the app.
