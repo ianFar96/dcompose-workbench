@@ -3,6 +3,7 @@ import { Button, TextField } from '@mui/material';
 import { invoke } from '@tauri-apps/api';
 import { message } from '@tauri-apps/api/dialog';
 import type { editor } from 'monaco-editor';
+import type { ChangeEvent } from 'react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import YAML from 'yaml';
 
@@ -19,6 +20,7 @@ type EditServiceProps = {
 
 export default function EditService(props: EditServiceProps) {
   const [serviceYamlString, setServiceYamlString] = useState<string>();
+  const [validationText, setValidationText] = useState<string | undefined>();
 
   useEffect(() => {
     if (props.serviceId) {
@@ -30,12 +32,27 @@ export default function EditService(props: EditServiceProps) {
     }
   }, [props.sceneName, props.serviceId]);
 
-  const [isServiceIdTaken, setIsServiceIdTaken] = useState(false);
-
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const onMount = (editor: editor.IStandaloneCodeEditor) => {
     editorRef.current = editor;
   };
+
+  const onChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const serviceId = event.target.value;
+    const isServiceIdTaken = props.serviceIds.some(service => service === serviceId && service !== props.serviceId);
+    if (isServiceIdTaken) {
+      setValidationText('A service with that Id already exists');
+      return;
+    }
+
+    const isServiceNameValid = /^[a-zA-Z0-9-_]+$/.test(serviceId);
+    if (!isServiceNameValid) {
+      setValidationText('Use only alphanumeric characters, - and _');
+      return;
+    }
+
+    setValidationText(undefined);
+  }, [props.serviceId, props.serviceIds]);
 
   const onSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -44,13 +61,10 @@ export default function EditService(props: EditServiceProps) {
     const { serviceId } = formJson;
     if (!serviceId) { return; }
 
-    const isServiceIdTaken = props.serviceIds.some(service => service === serviceId && service !== props.serviceId);
-    setIsServiceIdTaken(isServiceIdTaken);
-
-    if (!isServiceIdTaken) {
+    if (!validationText) {
       props.handleSubmit(serviceId as string, editorRef.current?.getValue() ?? '{}');
     }
-  }, [props]);
+  }, [props, validationText]);
 
   const defaultServiceTemplate = useMemo(() => YAML.stringify({
     image: 'mongo',
@@ -66,10 +80,11 @@ export default function EditService(props: EditServiceProps) {
         <TextField
           autoFocus
           defaultValue={props.serviceId}
-          error={isServiceIdTaken}
+          error={!!validationText}
           fullWidth
-          helperText={`${isServiceIdTaken ? 'A service with that Id already exists' : 'Use only alphanumeric characters, `-`, `/`, `:` and `_`.'}`}
+          helperText={validationText ?? 'Use only alphanumeric characters, - and _'}
           name='serviceId'
+          onChange={onChange}
           placeholder='Service Id'
           size='small'
           type='text'
@@ -83,7 +98,7 @@ export default function EditService(props: EditServiceProps) {
           defaultLanguage='yaml'
           defaultValue={serviceYamlString ?? defaultServiceTemplate}
           onMount={onMount}
-          options={{ scrollBeyondLastLine: false }}
+          options={{ padding: { top: 15 }, scrollBeyondLastLine: false }}
           theme='vs-dark'
         /> : undefined}
 

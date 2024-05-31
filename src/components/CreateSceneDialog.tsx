@@ -25,7 +25,7 @@ export default function CreateSceneDialog(props: CreateSceneDialogProps) {
       return;
     }
 
-    const isSceneNameValid = /^([a-z0-9-_]*)$/.test(sceneName);
+    const isSceneNameValid = /^[a-z0-9-_]+$/.test(sceneName);
     if (!isSceneNameValid) {
       setValidationText('A scene name can only contain alfanumeric lowercase characters, - and _');
       return;
